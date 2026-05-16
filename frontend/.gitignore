@@ -9,7 +9,8 @@
 /coverage
 
 # production
-/build
+# /build — intentionnellement commité pour Hostinger (pré-compilé)
+!/build
 
 # misc
 .DS_Store

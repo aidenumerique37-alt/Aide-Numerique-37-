@@ -236,13 +236,13 @@ const AdminPanel = () => {
     setLoading(true);
     try {
       const [contentRes, servicesRes, citiesRes, articlesRes, partnersRes, partnerCatsRes, syncStatusRes, cityPagesRes] = await Promise.all([
-        axios.get(`${BACKEND_URL}/api/admin/content`),
-        axios.get(`${BACKEND_URL}/api/admin/services`),
-        axios.get(`${BACKEND_URL}/api/admin/cities`),
-        axios.get(`${BACKEND_URL}/api/admin/articles`),
-        axios.get(`${BACKEND_URL}/api/admin/partners`),
-        axios.get(`${BACKEND_URL}/api/admin/partner-categories`),
-        axios.get(`${BACKEND_URL}/api/admin/articles/sync-status`).catch(() => ({ data: null })),
+        axios.get(`${BACKEND_URL}/api/admin/content`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/services`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/cities`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/articles`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/partners`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/partner-categories`, { headers: getAuthHeaders() }),
+        axios.get(`${BACKEND_URL}/api/admin/articles/sync-status`, { headers: getAuthHeaders() }).catch(() => ({ data: null })),
         axios.get(`${BACKEND_URL}/api/admin/city-pages`, { headers: getAuthHeaders() }).catch(() => ({ data: [] }))
       ]);
       setContent(contentRes.data);

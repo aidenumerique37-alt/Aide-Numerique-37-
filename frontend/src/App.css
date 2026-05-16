@@ -1,0 +1,84 @@
+/* App specific styles */
+.App {
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Subtle trust-inspiring background texture */
+.App::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url('./hero-bg.png');
+    background-size: 600px 600px;
+    background-repeat: repeat;
+    background-color: transparent;
+    opacity: 0.04;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+.dark .App::before {
+    opacity: 0.02;
+    filter: invert(1);
+}
+
+/* Ensure content sits above the texture */
+.App > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Smooth scrolling for the entire page */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom button hover effects */
+button, a {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+button:hover, a:hover {
+    transform: translateY(-1px);
+}
+
+/* Card hover effects */
+.group:hover {
+    transform: translateY(-4px);
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid hsl(var(--french-blue));
+    outline-offset: 2px;
+}
+
+/* Quill rich editor styles for admin */
+.quill-admin .ql-container {
+    min-height: 380px;
+    font-size: 14px;
+    font-family: 'Montserrat', sans-serif;
+    border: none;
+}
+.quill-admin .ql-toolbar {
+    background: #f8fafc;
+    border-bottom: 1px solid #e5e7eb;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+.quill-admin .ql-editor {
+    min-height: 380px;
+    line-height: 1.7;
+    padding: 16px 20px;
+}
+.quill-admin .ql-editor h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+.quill-admin .ql-editor h2 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+.quill-admin .ql-editor h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.4rem; }
+.quill-admin .ql-editor p { margin-bottom: 0.75rem; }
+.quill-admin .ql-editor ul, .quill-admin .ql-editor ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+

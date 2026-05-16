@@ -17,6 +17,12 @@ from email.mime.multipart import MIMEMultipart
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 
+try:
+    import anthropic as _anthropic_module
+    _ANTHROPIC_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_AVAILABLE = False
+
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -37,6 +43,7 @@ GOOGLE_PLACE_ID= os.getenv("GOOGLE_PLACE_ID", "")
 WP_BASE_URL    = os.getenv("WP_BASE_URL", "https://www.aidenumerique37.fr")
 SITE_URL       = os.getenv("SITE_URL", "https://www.aidenumerique37.fr")
 UPLOADS_DIR    = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -169,6 +176,22 @@ def _strip_mongo(doc: dict) -> dict:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# ── Anthropic AI helper ────────────────────────────────────────────────────────
+async def _claude(prompt: str, system: str = "", max_tokens: int = 4096) -> str:
+    """Call Claude claude-opus-4-5 and return the text response. Raises HTTPException if unavailable."""
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY non configurée sur le serveur")
+    if not _ANTHROPIC_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Bibliothèque anthropic non installée")
+    client = _anthropic_module.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    messages = [{"role": "user", "content": prompt}]
+    kwargs = {"model": "claude-opus-4-5", "max_tokens": max_tokens, "messages": messages}
+    if system:
+        kwargs["system"] = system
+    response = await client.messages.create(**kwargs)
+    return response.content[0].text
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PUBLIC ROUTES
@@ -836,20 +859,100 @@ async def sync_wordpress(background_tasks: BackgroundTasks, authorization: Optio
 @app.post("/api/admin/articles/backfill-seo")
 async def admin_backfill_seo(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    # Stub — AI feature requires ANTHROPIC_API_KEY
-    return {"success": True, "message": "Backfill SEO non disponible sans clé API IA"}
+
+    # Find articles missing meta_title or meta_description
+    articles = await db["articles"].find({
+        "$or": [
+            {"meta_title": {"$in": [None, ""]}},
+            {"meta_description": {"$in": [None, ""]}}
+        ]
+    }).to_list(length=200)
+
+    if not articles:
+        return {"success": True, "updated": 0, "message": "Tous les articles ont déjà leurs métadonnées SEO"}
+
+    import re as _re, json as _json, re as _re2
+
+    updated = 0
+    errors = []
+    for art in articles:
+        try:
+            plain = _re.sub(r"<[^>]+>", "", art.get("content", ""))[:1000]
+            prompt = f"""Pour l'article "{art.get('title', '')}", génère un meta title (50-60 car.) et une meta description SEO (150-160 car.).
+Contenu : {plain}
+Réponds UNIQUEMENT en JSON : {{"meta_title": "...", "meta_description": "..."}}"""
+            raw = await _claude(prompt, max_tokens=200)
+            match = _re2.search(r"\{.*\}", raw, _re2.DOTALL)
+            if match:
+                meta = _json.loads(match.group())
+                await db["articles"].update_one(
+                    {"slug": art["slug"]},
+                    {"$set": {"meta_title": meta.get("meta_title", ""), "meta_description": meta.get("meta_description", ""), "updated_at": _now()}}
+                )
+                updated += 1
+        except Exception as e:
+            errors.append({"slug": art.get("slug", "?"), "error": str(e)})
+
+    return {"success": True, "updated": updated, "total": len(articles), "errors": errors}
 
 
 @app.post("/api/admin/articles/auto-enrich")
 async def admin_auto_enrich(data: dict, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"success": True, "run_id": str(uuid.uuid4()), "message": "Auto-enrich non disponible sans clé API IA"}
+    run_id = str(uuid.uuid4())
+    master_prompt = data.get("master_prompt", "")
+    limit = int(data.get("limit", 10))
+
+    # Pick articles to enrich (those without tags or with short content)
+    articles = await db["articles"].find({}).to_list(length=500)
+    to_enrich = [a for a in articles if not a.get("tags") or len(a.get("tags", [])) == 0][:limit]
+
+    await db["enrich_status"].update_one(
+        {"run_id": run_id},
+        {"$set": {"run_id": run_id, "status": "running", "progress": 0, "total": len(to_enrich), "started_at": _now()}},
+        upsert=True
+    )
+
+    async def _do_enrich():
+        import re as _re, json as _json, re as _re2
+        system = master_prompt if master_prompt else (
+            "Tu es un expert SEO pour un site d'aide numérique en Indre-et-Loire. Langue : français."
+        )
+        done = 0
+        for art in to_enrich:
+            try:
+                plain = _re.sub(r"<[^>]+>", "", art.get("content", ""))[:800]
+                prompt = f"""Pour l'article "{art.get('title', '')}", génère 3 à 5 tags pertinents (mots-clés courts).
+Réponds UNIQUEMENT en JSON : {{"tags": ["tag1", "tag2", "tag3"]}}"""
+                raw = await _claude(prompt, system=system, max_tokens=100)
+                match = _re2.search(r"\{.*\}", raw, _re2.DOTALL)
+                if match:
+                    result = _json.loads(match.group())
+                    tags = result.get("tags", [])
+                    await db["articles"].update_one(
+                        {"slug": art["slug"]},
+                        {"$set": {"tags": tags, "updated_at": _now()}}
+                    )
+                done += 1
+                await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"progress": done}})
+            except Exception:
+                done += 1
+                await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"progress": done}})
+        await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"status": "done"}})
+
+    asyncio.create_task(_do_enrich())
+    return {"success": True, "run_id": run_id, "total": len(to_enrich)}
 
 
 @app.get("/api/admin/articles/auto-enrich/status")
 async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"status": "idle", "progress": 0, "total": 0}
+    if not run_id:
+        return {"status": "idle", "progress": 0, "total": 0}
+    doc = await db["enrich_status"].find_one({"run_id": run_id})
+    if not doc:
+        return {"status": "idle", "progress": 0, "total": 0}
+    return {"status": doc.get("status", "idle"), "progress": doc.get("progress", 0), "total": doc.get("total", 0)}
 
 
 @app.post("/api/admin/articles/update-years")
@@ -867,31 +970,163 @@ async def admin_fix_broken_links(authorization: Optional[str] = Header(None)):
 @app.post("/api/admin/articles/{slug}/generate-image")
 async def admin_generate_image(slug: str, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"success": False, "message": "Génération d'image non disponible sans clé API IA"}
+    # Image generation requires a dedicated image model (DALL-E, Stable Diffusion, etc.)
+    # Claude API generates text only — this feature is not available
+    return {"success": False, "message": "La génération d'image nécessite une clé API dédiée (DALL-E, Stable Diffusion…). Non disponible actuellement."}
 
 
 @app.post("/api/admin/articles/{slug}/generate-meta")
 async def admin_generate_meta(slug: str, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"success": False, "message": "Génération de méta non disponible sans clé API IA"}
+    article = await db["articles"].find_one({"slug": slug})
+    if not article:
+        raise HTTPException(status_code=404, detail="Article introuvable")
+
+    import re as _re
+    plain = _re.sub(r"<[^>]+>", "", article.get("content", ""))[:1500]
+
+    prompt = f"""Pour cet article de blog intitulé "{article.get('title', '')}", génère :
+1. Un meta title SEO (50-60 caractères max, accrocheur)
+2. Une meta description SEO (150-160 caractères max, avec appel à l'action)
+
+Contenu de l'article (extrait) :
+{plain}
+
+Réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaire :
+{{"meta_title": "...", "meta_description": "..."}}"""
+
+    raw = await _claude(prompt, max_tokens=300)
+    # Parse JSON from response
+    import json as _json
+    import re as _re2
+    match = _re2.search(r"\{.*\}", raw, _re2.DOTALL)
+    if not match:
+        raise HTTPException(status_code=500, detail="Réponse IA invalide")
+    meta = _json.loads(match.group())
+    await db["articles"].update_one(
+        {"slug": slug},
+        {"$set": {"meta_title": meta.get("meta_title", ""), "meta_description": meta.get("meta_description", ""), "updated_at": _now()}}
+    )
+    return {"success": True, "meta_title": meta.get("meta_title", ""), "meta_description": meta.get("meta_description", "")}
 
 
 @app.post("/api/admin/articles/{slug}/regenerate")
-async def admin_regenerate_article(slug: str, authorization: Optional[str] = Header(None)):
+async def admin_regenerate_article(slug: str, data: dict = {}, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"success": False, "run_id": None, "message": "Régénération non disponible sans clé API IA"}
+    article = await db["articles"].find_one({"slug": slug})
+    if not article:
+        raise HTTPException(status_code=404, detail="Article introuvable")
+
+    run_id = str(uuid.uuid4())
+    # Store running status
+    await db["regen_status"].update_one(
+        {"slug": slug}, {"$set": {"slug": slug, "run_id": run_id, "status": "running", "started_at": _now()}}, upsert=True
+    )
+
+    async def _do_regen():
+        try:
+            import re as _re
+            plain = _re.sub(r"<[^>]+>", "", article.get("content", ""))[:1200]
+            master_prompt = data.get("master_prompt", "")
+            system = master_prompt if master_prompt else (
+                "Tu es un expert en rédaction web SEO pour une entreprise d'aide numérique en Indre-et-Loire (37). "
+                "Style : clair, humain, professionnel. Langue : français."
+            )
+            prompt = f"""Réécris et améliore cet article de blog intitulé "{article.get('title', '')}" en le rendant plus engageant, plus complet et mieux optimisé SEO.
+
+Contenu actuel :
+{plain}
+
+Retourne UNIQUEMENT le contenu HTML amélioré (<h2>, <h3>, <p>, <ul>, <li>, <strong>). Pas de balise <html>/<body>."""
+            new_content = await _claude(prompt, system=system, max_tokens=2000)
+            plain2 = _re.sub(r"<[^>]+>", "", new_content)
+            excerpt = plain2.strip()[:160].rsplit(" ", 1)[0] + "…" if len(plain2) > 160 else plain2.strip()
+            await db["articles"].update_one(
+                {"slug": slug},
+                {"$set": {"content": new_content, "excerpt": excerpt, "updated_at": _now()}}
+            )
+            await db["regen_status"].update_one({"slug": slug}, {"$set": {"status": "done", "run_id": run_id}})
+        except Exception as e:
+            await db["regen_status"].update_one({"slug": slug}, {"$set": {"status": "error", "error": str(e)}})
+
+    asyncio.create_task(_do_regen())
+    return {"success": True, "run_id": run_id}
 
 
 @app.get("/api/admin/articles/{slug}/regeneration-status")
 async def admin_regeneration_status(slug: str, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"status": "idle"}
+    doc = await db["regen_status"].find_one({"slug": slug})
+    if not doc:
+        return {"status": "idle"}
+    return {"status": doc.get("status", "idle"), "run_id": doc.get("run_id"), "error": doc.get("error")}
 
 
 @app.post("/api/admin/generate-article")
 async def admin_generate_article(data: dict, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    return {"success": False, "message": "Génération IA non disponible sans clé ANTHROPIC_API_KEY"}
+    title = data.get("title", "").strip()
+    master_prompt = data.get("master_prompt", "").strip()
+    extra_context = data.get("extra_context", "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Le champ 'title' est requis")
+
+    system = (
+        master_prompt
+        if master_prompt
+        else (
+            "Tu es un expert en rédaction web SEO pour une entreprise d'aide numérique en Indre-et-Loire (37). "
+            "Tu rédiges des articles de blog informatifs, bienveillants et accessibles, destinés à des personnes "
+            "peu à l'aise avec la technologie. Style : clair, humain, professionnel. Pas de jargon technique inutile. "
+            "Langue : français."
+        )
+    )
+
+    context_block = f"\n\nContexte supplémentaire : {extra_context}" if extra_context else ""
+    prompt = f"""Rédige un article de blog complet et optimisé SEO sur le sujet suivant : "{title}"{context_block}
+
+L'article doit :
+- Avoir une introduction engageante (2-3 paragraphes)
+- Être structuré avec des sous-titres H2 et H3 (en markdown)
+- Contenir entre 600 et 900 mots
+- Inclure des conseils pratiques et concrets
+- Se terminer par une conclusion avec un appel à l'action doux
+- Être rédigé en français
+
+Retourne UNIQUEMENT le contenu de l'article en HTML (utilise <h2>, <h3>, <p>, <ul>, <li>, <strong>). Pas de balise <html>, <body> ou <head>."""
+
+    html_content = await _claude(prompt, system=system, max_tokens=2000)
+
+    # Build a complete article document
+    slug = _slug(title)
+    # Ensure unique slug
+    existing = await db["articles"].find_one({"slug": slug})
+    if existing:
+        slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+
+    # Extract a short excerpt (first ~160 chars of text content)
+    import re as _re
+    plain = _re.sub(r"<[^>]+>", "", html_content)
+    excerpt = plain.strip()[:160].rsplit(" ", 1)[0] + "…" if len(plain) > 160 else plain.strip()
+
+    article = {
+        "slug": slug,
+        "title": title,
+        "content": html_content,
+        "excerpt": excerpt,
+        "category": data.get("default_category", "Conseils & Astuces"),
+        "tags": [],
+        "status": "draft",
+        "featured_image": "",
+        "meta_title": title,
+        "meta_description": excerpt,
+        "created_at": _now(),
+        "updated_at": _now(),
+        "ai_generated": True,
+    }
+    await db["articles"].insert_one(article)
+    article = _strip_mongo(article)
+    return {"success": True, "article": article}
 
 
 @app.post("/api/admin/sitemap/regenerate")

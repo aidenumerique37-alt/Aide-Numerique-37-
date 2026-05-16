@@ -1090,6 +1090,43 @@ async def upload_file(
     return {"url": url, "filename": filename}
 
 
+@app.post("/api/upload/multiple")
+async def upload_multiple_files(
+    files: List[UploadFile] = File(...),
+    context: str = Query("default"),
+    category: str = Query(""),
+    authorization: Optional[str] = Header(None),
+):
+    _check_admin(authorization)
+    allowed = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".mp4", ".webm", ".pdf"}
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
+                ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+    results = []
+    import base64
+    for file in files:
+        ext = Path(file.filename).suffix.lower() if file.filename else ".bin"
+        if ext not in allowed:
+            results.append({"error": f"{file.filename} : type non autorisé", "filename": file.filename})
+            continue
+        content = await file.read()
+        mime = mime_map.get(ext, "application/octet-stream")
+        prefix = "ai_" if context == "ai" else ""
+        filename = f"{prefix}{uuid.uuid4().hex}{ext}"
+        data_b64 = base64.b64encode(content).decode("utf-8")
+        url = f"/api/uploads/{filename}"
+        meta = {"filename": filename, "url": url, "category": category, "context": context,
+                "original_name": file.filename, "size": len(content), "mime": mime,
+                "data_b64": data_b64, "created_at": _now()}
+        await db["media"].insert_one(meta)
+        try:
+            (UPLOADS_DIR / filename).write_bytes(content)
+        except Exception:
+            pass
+        results.append({"url": url, "filename": filename, "original_name": file.filename})
+    return {"uploaded": len([r for r in results if "url" in r]), "total": len(files), "results": results}
+
+
 @app.get("/api/upload/gallery")
 async def get_gallery(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)

@@ -24,6 +24,8 @@ const MediaLibrary = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
+  const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [showAI, setShowAI] = useState(false);
@@ -51,25 +53,45 @@ const MediaLibrary = () => {
 
   useEffect(() => { loadImages(); }, []);
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const uploadFiles = async (files) => {
+    if (!files || files.length === 0) return;
     setUploading(true);
+    setUploadProgress({ done: 0, total: files.length });
+
+    // Batch upload (all at once via /api/upload/multiple)
     const formData = new FormData();
-    formData.append('file', file);
+    Array.from(files).forEach(f => formData.append('files', f));
     try {
-      await axios.post(
-        `${BACKEND_URL}/api/upload?context=default&category=${encodeURIComponent(uploadCategory)}`,
+      const res = await axios.post(
+        `${BACKEND_URL}/api/upload/multiple?context=default&category=${encodeURIComponent(uploadCategory)}`,
         formData,
-        { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' } }
+        {
+          headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (e) => {
+            const pct = Math.round((e.loaded / e.total) * files.length);
+            setUploadProgress(p => ({ ...p, done: Math.min(pct, files.length) }));
+          }
+        }
       );
+      setUploadProgress({ done: files.length, total: files.length });
+      const errors = (res.data.results || []).filter(r => r.error);
+      if (errors.length > 0) alert('Erreurs : ' + errors.map(e => e.error).join('\n'));
       loadImages();
     } catch (err) {
       alert('Erreur upload : ' + (err.response?.data?.detail || err.message));
     } finally {
       setUploading(false);
+      setUploadProgress({ done: 0, total: 0 });
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleUpload = (e) => uploadFiles(e.target.files);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    uploadFiles(e.dataTransfer.files);
   };
 
   const copyUrl = (url) => {
@@ -194,7 +216,7 @@ const MediaLibrary = () => {
           ))}
         </select>
 
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleUpload} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/svg+xml,video/mp4,video/webm" multiple onChange={handleUpload} className="hidden" />
         <Button
           variant="outline"
           onClick={() => setShowAI(true)}
@@ -204,9 +226,37 @@ const MediaLibrary = () => {
           <Sparkles size={16} className="mr-2 text-purple-500" />Générer avec IA
         </Button>
         <Button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="bg-french-blue hover:bg-french-blue/90">
-          {uploading ? <RefreshCw size={16} className="animate-spin mr-2" /> : <Upload size={16} className="mr-2" />}
-          {uploading ? 'Upload...' : 'Ajouter une image'}
+          {uploading
+            ? <><RefreshCw size={16} className="animate-spin mr-2" />{uploadProgress.done}/{uploadProgress.total} uploadé(s)…</>
+            : <><Upload size={16} className="mr-2" />Ajouter des images</>}
         </Button>
+      </div>
+
+      {/* Barre de progression */}
+      {uploading && uploadProgress.total > 0 && (
+        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-french-blue h-2 rounded-full transition-all duration-300"
+            style={{ width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%` }}
+          />
+        </div>
+      )}
+
+      {/* Zone de drop */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => !uploading && fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+          dragOver ? 'border-french-blue bg-french-blue/5 scale-[1.01]' : 'border-gray-200 hover:border-french-blue/40 hover:bg-gray-50'
+        } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <Upload size={24} className={`mx-auto mb-2 ${dragOver ? 'text-french-blue' : 'text-gray-400'}`} />
+        <p className="text-sm font-medium text-gray-600">
+          {dragOver ? 'Déposer les fichiers ici' : 'Glisser-déposer des images ici ou cliquer pour sélectionner'}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">Sélection multiple possible · JPG, PNG, WEBP, GIF, SVG, MP4</p>
       </div>
 
       {/* Category filter tabs */}

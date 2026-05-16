@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+
+# Pages privées
+Disallow: /admin
+Disallow: /admin/
+
+# Bloquer les paramètres d'URL parasites générés par WordPress
+Disallow: /*?wptouch_switch=*
+Disallow: /*?wptouch*
+Disallow: /*?taxonomy=*
+Disallow: /*?term=*
+Disallow: /*?p=
+Disallow: /*?cat=
+Disallow: /*?tag=
+Disallow: /*?author=
+Disallow: /*?feed=
+Disallow: /*?attachment_id=
+Disallow: /*?replytocom=
+Disallow: /*?s=
+Disallow: /*?lang=
+Disallow: /*?ver=
+
+# WordPress admin (ancienne structure)
+Disallow: /wp-admin/
+
+# Sitemap — URL standard (directement lisible par Google Search Console)
+Sitemap: https://www.aidenumerique37.fr/sitemap.xml

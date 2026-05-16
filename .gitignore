@@ -7,7 +7,7 @@ node_modules/
 # ── Builds ────────────────────────────────────────────────────────────────────
 /build
 dist/
-frontend/build/
+# frontend/build/ est commité intentionnellement pour déploiement Hostinger sans compilation
 
 # ── Environnement & secrets ───────────────────────────────────────────────────
 .env

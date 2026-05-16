@@ -1,0 +1,19 @@
+{
+  "name": "aidenumerique37",
+  "version": "1.0.0",
+  "description": "Site vitrine Aide Numérique 37",
+  "main": "server.js",
+  "scripts": {
+    "install:all": "cd frontend && yarn install --frozen-lockfile",
+    "build": "cd frontend && yarn build",
+    "start": "node server.js",
+    "deploy": "git pull && npm run build && pm2 reload ecosystem.config.js --env production"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^3.0.0"
+  }
+}

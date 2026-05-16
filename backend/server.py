@@ -292,11 +292,26 @@ async def get_google_reviews():
                 timeout=10,
             )
             data = r.json().get("result", {})
-            reviews = data.get("reviews", [])
+            raw_reviews = data.get("reviews", [])
+            # Normalize Google Places API format → frontend expected format
+            reviews = [
+                {
+                    "rating": rev.get("rating", 5),
+                    "text": rev.get("text", ""),
+                    "relative_time_description": rev.get("relative_time_description", ""),
+                    "author": {
+                        "name": rev.get("author_name", "Anonyme"),
+                        "profile_photo_url": rev.get("profile_photo_url", ""),
+                        "url": rev.get("author_url", ""),
+                    },
+                }
+                for rev in raw_reviews
+            ]
             result = {
                 "rating": data.get("rating", 0),
                 "total_ratings": data.get("user_ratings_total", 0),
-                "reviews": reviews[:5],
+                "user_ratings_total": data.get("user_ratings_total", 0),
+                "reviews": reviews,
             }
             _reviews_cache["data"] = result
             _reviews_cache["ts"] = time.time()

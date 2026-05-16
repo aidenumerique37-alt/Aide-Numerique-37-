@@ -57,6 +57,8 @@ db = None
 @app.on_event("startup")
 async def startup():
     global client, db
+    mongo_host = MONGO_URL[:40] if MONGO_URL else "NOT SET"
+    print(f"[db] MONGO_URL starts with: {mongo_host}")
     print(f"[db] Connecting to MongoDB...")
     try:
         client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=10000)

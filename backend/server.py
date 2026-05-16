@@ -313,13 +313,21 @@ async def send_contact(form: ContactForm):
         raise HTTPException(status_code=500, detail=f"Erreur envoi email : {str(e)}")
 
 
-# ── Static uploads ────────────────────────────────────────────────────────────
+# ── Static uploads — served from MongoDB (persistent) ─────────────────────────
 @app.get("/api/uploads/{filename}")
 async def serve_upload(filename: str):
+    # Try MongoDB first (persistent storage)
+    doc = await db["media"].find_one({"filename": filename})
+    if doc and doc.get("data_b64"):
+        import base64
+        data = base64.b64decode(doc["data_b64"])
+        mime = doc.get("mime", "application/octet-stream")
+        return Response(content=data, media_type=mime)
+    # Fallback: filesystem (local dev)
     path = UPLOADS_DIR / filename
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path)
+    if path.exists():
+        return FileResponse(path)
+    raise HTTPException(status_code=404, detail="File not found")
 
 
 # ── Sitemap ───────────────────────────────────────────────────────────────────
@@ -1055,15 +1063,30 @@ async def upload_file(
     if ext not in allowed:
         raise HTTPException(status_code=400, detail="Type de fichier non autorisé")
 
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
+                ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
+    mime = mime_map.get(ext, "application/octet-stream")
+
     prefix = "ai_" if context == "ai" else ""
     filename = f"{prefix}{uuid.uuid4().hex}{ext}"
-    (UPLOADS_DIR / filename).write_bytes(content)
+
+    import base64
+    data_b64 = base64.b64encode(content).decode("utf-8")
 
     url = f"/api/uploads/{filename}"
-    # Store metadata in DB
+    # Store file content in MongoDB (persistent — survives Railway restarts)
     meta = {"filename": filename, "url": url, "category": category, "context": context,
-            "original_name": file.filename, "size": len(content), "created_at": _now()}
+            "original_name": file.filename, "size": len(content), "mime": mime,
+            "data_b64": data_b64, "created_at": _now()}
     await db["media"].insert_one(meta)
+
+    # Also write to filesystem as cache (best-effort)
+    try:
+        (UPLOADS_DIR / filename).write_bytes(content)
+    except Exception:
+        pass
+
     return {"url": url, "filename": filename}
 
 

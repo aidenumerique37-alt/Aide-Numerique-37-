@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "install:all": "cd frontend && yarn install --frozen-lockfile",
-    "build": "cd frontend && yarn build",
+    "build": "echo 'Build pre-compilé dans frontend/build/'",
     "start": "node server.js",
     "deploy": "git pull && npm run build && pm2 reload ecosystem.config.js --env production"
   },

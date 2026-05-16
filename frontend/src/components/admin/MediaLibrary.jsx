@@ -53,37 +53,44 @@ const MediaLibrary = () => {
 
   useEffect(() => { loadImages(); }, []);
 
+  const BATCH_SIZE = 5; // max files per request to avoid payload size limits
+
   const uploadFiles = async (files) => {
     if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
     setUploading(true);
-    setUploadProgress({ done: 0, total: files.length });
+    setUploadProgress({ done: 0, total: fileArray.length });
 
-    // Batch upload (all at once via /api/upload/multiple)
-    const formData = new FormData();
-    Array.from(files).forEach(f => formData.append('files', f));
-    try {
-      const res = await axios.post(
-        `${BACKEND_URL}/api/upload/multiple?context=default&category=${encodeURIComponent(uploadCategory)}`,
-        formData,
-        {
-          headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (e) => {
-            const pct = Math.round((e.loaded / e.total) * files.length);
-            setUploadProgress(p => ({ ...p, done: Math.min(pct, files.length) }));
-          }
-        }
-      );
-      setUploadProgress({ done: files.length, total: files.length });
-      const errors = (res.data.results || []).filter(r => r.error);
-      if (errors.length > 0) alert('Erreurs : ' + errors.map(e => e.error).join('\n'));
-      loadImages();
-    } catch (err) {
-      alert('Erreur upload : ' + (err.response?.data?.detail || err.message));
-    } finally {
-      setUploading(false);
-      setUploadProgress({ done: 0, total: 0 });
-      if (fileInputRef.current) fileInputRef.current.value = '';
+    const allErrors = [];
+    let done = 0;
+
+    // Upload in batches of BATCH_SIZE
+    for (let i = 0; i < fileArray.length; i += BATCH_SIZE) {
+      const batch = fileArray.slice(i, i + BATCH_SIZE);
+      const formData = new FormData();
+      batch.forEach(f => formData.append('files', f));
+      try {
+        const res = await axios.post(
+          `${BACKEND_URL}/api/upload/multiple?context=default&category=${encodeURIComponent(uploadCategory)}`,
+          formData,
+          { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' } }
+        );
+        const batchErrors = (res.data.results || []).filter(r => r.error);
+        allErrors.push(...batchErrors);
+        done += batch.length;
+        setUploadProgress({ done, total: fileArray.length });
+      } catch (err) {
+        allErrors.push({ error: err.response?.data?.detail || err.message });
+        done += batch.length;
+        setUploadProgress({ done, total: fileArray.length });
+      }
     }
+
+    if (allErrors.length > 0) alert('Erreurs : ' + allErrors.map(e => e.error).join('\n'));
+    loadImages();
+    setUploading(false);
+    setUploadProgress({ done: 0, total: 0 });
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleUpload = (e) => uploadFiles(e.target.files);

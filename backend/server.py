@@ -288,7 +288,7 @@ async def get_google_reviews():
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 "https://maps.googleapis.com/maps/api/place/details/json",
-                params={"place_id": GOOGLE_PLACE_ID, "fields": "rating,reviews,user_ratings_total", "key": GOOGLE_API_KEY},
+                params={"place_id": GOOGLE_PLACE_ID, "fields": "rating,reviews,user_ratings_total", "key": GOOGLE_API_KEY, "language": "fr"},
                 timeout=10,
             )
             data = r.json().get("result", {})

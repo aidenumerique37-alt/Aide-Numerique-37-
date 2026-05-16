@@ -55,10 +55,15 @@ async def main():
     else:
         print(f"  ⏭  partners: déjà présents")
 
-    # ── Partner categories ────────────────────────────────────────────────────
+    # ── Partner categories (liste de strings) ────────────────────────────────
     if await db["partner_categories"].count_documents({}) == 0:
-        docs = json.loads((DATA_DIR / "partner_categories.json").read_text())
-        for d in docs: d.pop("_id", None)
+        raw = json.loads((DATA_DIR / "partner_categories.json").read_text())
+        # Peut être une liste de strings ou de dicts
+        if raw and isinstance(raw[0], str):
+            docs = [{"name": name} for name in raw]
+        else:
+            docs = raw
+            for d in docs: d.pop("_id", None)
         if docs:
             await db["partner_categories"].insert_many(docs)
         print(f"  ✅ partner_categories: {len(docs)} insérés")

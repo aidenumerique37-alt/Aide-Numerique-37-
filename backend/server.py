@@ -36,7 +36,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_PLACE_ID= os.getenv("GOOGLE_PLACE_ID", "")
 WP_BASE_URL    = os.getenv("WP_BASE_URL", "https://www.aidenumerique37.fr")
 SITE_URL       = os.getenv("SITE_URL", "https://www.aidenumerique37.fr")
-UPLOADS_DIR    = Path(os.getenv("UPLOADS_DIR", "../uploads"))
+UPLOADS_DIR    = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -54,29 +54,18 @@ app.add_middleware(
 client: AsyncIOMotorClient = None
 db = None
 
-async def _try_connect_mongo() -> bool:
-    """Try to connect to MongoDB; return True on success."""
-    try:
-        c = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=3000)
-        await c.admin.command("ping")
-        return True
-    except Exception:
-        return False
-
 @app.on_event("startup")
 async def startup():
     global client, db
-    mongo_ok = await _try_connect_mongo()
-    if mongo_ok:
-        client = AsyncIOMotorClient(MONGO_URL)
+    print(f"[db] Connecting to MongoDB...")
+    try:
+        client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=10000)
+        await client.admin.command("ping")
         db = client[DB_NAME]
-        print("[db] Connected to MongoDB")
-    else:
-        # Fallback: mongomock-motor (async in-memory) for local dev
-        print("[db] MongoDB unavailable — using in-memory store (mongomock)")
-        from mongomock_motor import AsyncMongoMockClient
-        client = AsyncMongoMockClient()
-        db = client[DB_NAME]
+        print("[db] Connected to MongoDB Atlas ✓")
+    except Exception as e:
+        print(f"[db] MongoDB connection FAILED: {e}")
+        raise RuntimeError(f"Cannot connect to MongoDB: {e}")
     await _seed_db_if_empty()
     _start_scheduler()
 

@@ -62,6 +62,7 @@
   "scripts": {
     "start": "craco start",
     "build": "echo 'Using pre-built files in build/'",
+    "build:prod": "REACT_APP_BACKEND_URL=https://aide-numerique-37-production.up.railway.app npx craco build",
     "test": "craco test"
   },
   "browserslist": {

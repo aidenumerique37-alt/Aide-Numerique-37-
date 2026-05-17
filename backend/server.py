@@ -334,51 +334,60 @@ class ContactForm(BaseModel):
 async def send_contact(form: ContactForm):
     if not SMTP_USER or not SMTP_PASS:
         raise HTTPException(status_code=503, detail="SMTP not configured")
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["From"]    = SMTP_USER
-        msg["To"]      = CONTACT_EMAIL
-        msg["Reply-To"]= form.email
 
-        options_str = ", ".join(form.service_options) if form.service_options else "—"
-        subject_line = form.service or form.subject or "Nouveau message"
-        body = f"""Nouveau message depuis le site web\n\nNom : {form.name}\nEmail : {form.email}\nTéléphone : {form.phone or 'Non renseigné'}\nService : {form.service or 'Non renseigné'}\nOptions : {options_str}\nSujet : {form.subject or 'Non renseigné'}\n\nMessage :\n{form.message}"""
-        html = f"""<html><body style="font-family:Arial,sans-serif;color:#333">
-<h2 style="color:#1a56db">Nouveau message — Aide Numérique 37</h2>
-<table style="border-collapse:collapse;width:100%">
-  <tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Nom</td><td style="padding:8px;border:1px solid #e5e7eb">{form.name}</td></tr>
-  <tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #e5e7eb"><a href="mailto:{form.email}">{form.email}</a></td></tr>
-  <tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Téléphone</td><td style="padding:8px;border:1px solid #e5e7eb">{form.phone or 'Non renseigné'}</td></tr>
-  <tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Service demandé</td><td style="padding:8px;border:1px solid #e5e7eb"><strong>{form.service or 'Non renseigné'}</strong></td></tr>
-  <tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Options</td><td style="padding:8px;border:1px solid #e5e7eb">{options_str}</td></tr>
-</table>
-<h3 style="color:#1a56db;margin-top:20px">Message</h3>
-<p style="background:#f9fafb;padding:16px;border-radius:8px;line-height:1.6">{form.message.replace(chr(10), '<br>')}</p>
-</body></html>"""
-        msg["Subject"] = f"[Aide Numérique 37] {subject_line}"
+    msg = MIMEMultipart("alternative")
+    msg["From"]    = SMTP_USER
+    msg["To"]      = CONTACT_EMAIL
+    msg["Reply-To"]= form.email
 
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
+    options_str = ", ".join(form.service_options) if form.service_options else "—"
+    subject_line = form.service or form.subject or "Nouveau message"
+    msg["Subject"] = f"[Aide Numérique 37] {subject_line}"
 
-        # Try port 587 STARTTLS first (Railway-compatible), fallback to configured port
-        sent = False
-        last_err = None
-        for port, use_tls, start_tls in [(587, False, True), (465, True, False), (SMTP_PORT, True, False)]:
-            try:
-                await aiosmtplib.send(
-                    msg, hostname=SMTP_HOST, port=port,
-                    use_tls=use_tls, start_tls=start_tls,
-                    username=SMTP_USER, password=SMTP_PASS,
-                    timeout=15,
-                )
-                sent = True
-                break
-            except Exception as e:
-                last_err = e
-                continue
-        if not sent:
-            raise HTTPException(status_code=500, detail=f"Erreur envoi email : {str(last_err)}")
-        return {"success": True, "message": "Message envoyé avec succès"}
+    body = (
+        f"Nouveau message depuis le site web\n\n"
+        f"Nom : {form.name}\nEmail : {form.email}\n"
+        f"Téléphone : {form.phone or 'Non renseigné'}\n"
+        f"Service : {form.service or 'Non renseigné'}\nOptions : {options_str}\n"
+        f"Sujet : {form.subject or 'Non renseigné'}\n\nMessage :\n{form.message}"
+    )
+    html = (
+        f'<html><body style="font-family:Arial,sans-serif;color:#333">'
+        f'<h2 style="color:#1a56db">Nouveau message — Aide Numérique 37</h2>'
+        f'<table style="border-collapse:collapse;width:100%">'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Nom</td><td style="padding:8px;border:1px solid #e5e7eb">{form.name}</td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #e5e7eb"><a href="mailto:{form.email}">{form.email}</a></td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Téléphone</td><td style="padding:8px;border:1px solid #e5e7eb">{form.phone or "Non renseigné"}</td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Service</td><td style="padding:8px;border:1px solid #e5e7eb"><strong>{form.service or "Non renseigné"}</strong></td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Options</td><td style="padding:8px;border:1px solid #e5e7eb">{options_str}</td></tr>'
+        f'</table>'
+        f'<h3 style="color:#1a56db;margin-top:20px">Message</h3>'
+        f'<p style="background:#f9fafb;padding:16px;border-radius:8px;line-height:1.6">{form.message.replace(chr(10), "<br>")}</p>'
+        f'</body></html>'
+    )
+
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    # Try port 587 STARTTLS first (Railway-compatible), then 465 SSL
+    sent = False
+    last_err = None
+    for port, use_tls, start_tls in [(587, False, True), (465, True, False), (SMTP_PORT, SMTP_PORT != 587, SMTP_PORT == 587)]:
+        try:
+            await aiosmtplib.send(
+                msg, hostname=SMTP_HOST, port=port,
+                use_tls=use_tls, start_tls=start_tls,
+                username=SMTP_USER, password=SMTP_PASS,
+                timeout=15,
+            )
+            sent = True
+            break
+        except Exception as e:
+            last_err = e
+            continue
+    if not sent:
+        raise HTTPException(status_code=500, detail=f"Erreur envoi email : {str(last_err)}")
+    return {"success": True, "message": "Message envoyé avec succès"}
 
 
 # ── Static uploads — served from MongoDB (persistent) ─────────────────────────

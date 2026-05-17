@@ -285,15 +285,19 @@ const AdminPanel = () => {
 
   const deleteProject = async (id) => {
     if (!window.confirm('Supprimer cette réalisation ?')) return;
-    await axios.delete(`${BACKEND_URL}/api/admin/portfolio/${id}`, { headers: getAuthHeaders() });
-    setPortfolioProjects(prev => prev.filter(p => p.id !== id));
+    try {
+      await axios.delete(`${BACKEND_URL}/api/admin/portfolio/${id}`, { headers: getAuthHeaders() });
+      setPortfolioProjects(prev => prev.filter(p => p.id !== id));
+    } catch (e) { alert('Erreur suppression : ' + (e.response?.data?.detail || e.message)); }
   };
 
   // ============ ARTICLES CRUD ============
   const deleteArticle = async (slug) => {
     if (!window.confirm('Supprimer définitivement cet article ?')) return;
-    await axios.delete(`${BACKEND_URL}/api/admin/articles/${slug}`, { headers: getAuthHeaders() });
-    setArticles(prev => prev.filter(a => a.slug !== slug));
+    try {
+      await axios.delete(`${BACKEND_URL}/api/admin/articles/${slug}`, { headers: getAuthHeaders() });
+      setArticles(prev => prev.filter(a => a.slug !== slug));
+    } catch (e) { alert('Erreur suppression : ' + (e.response?.data?.detail || e.message)); }
   };
 
   const saveArticle = async () => {
@@ -466,16 +470,20 @@ const AdminPanel = () => {
     const url = isNew
       ? `${BACKEND_URL}/api/admin/city-pages`
       : `${BACKEND_URL}/api/admin/city-pages/${page.slug}`;
-    await axios[method](url, page, { headers: getAuthHeaders() });
-    const res = await axios.get(`${BACKEND_URL}/api/admin/city-pages`, { headers: getAuthHeaders() });
-    setCityPages(res.data);
-    setEditingCityPage(null);
+    try {
+      await axios[method](url, page, { headers: getAuthHeaders() });
+      const res = await axios.get(`${BACKEND_URL}/api/admin/city-pages`, { headers: getAuthHeaders() });
+      setCityPages(res.data);
+      setEditingCityPage(null);
+    } catch (e) { alert('Erreur sauvegarde ville : ' + (e.response?.data?.detail || e.message)); }
   };
 
   const deleteCityPage = async (slug) => {
     if (!window.confirm('Supprimer cette page de ville ?')) return;
-    await axios.delete(`${BACKEND_URL}/api/admin/city-pages/${slug}`, { headers: getAuthHeaders() });
-    setCityPages(prev => prev.filter(p => p.slug !== slug));
+    try {
+      await axios.delete(`${BACKEND_URL}/api/admin/city-pages/${slug}`, { headers: getAuthHeaders() });
+      setCityPages(prev => prev.filter(p => p.slug !== slug));
+    } catch (e) { alert('Erreur suppression : ' + (e.response?.data?.detail || e.message)); }
   };
 
   const generateCityImage = async (slug) => {

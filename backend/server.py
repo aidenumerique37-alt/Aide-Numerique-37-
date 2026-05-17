@@ -72,11 +72,18 @@ except ImportError:
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Aide Numérique 37 API", version="1.0.0")
 
+_ALLOWED_ORIGINS = [
+    "https://www.aidenumerique37.fr",
+    "https://aidenumerique37.fr",
+    "http://localhost:3000",   # dev
+    "http://localhost:3001",   # dev alt
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=False,
 )
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -300,6 +307,13 @@ async def get_public_settings():
     }
 
 # ── Articles (public) ─────────────────────────────────────────────────────────
+@app.get("/api/articles/categories")
+async def get_article_categories():
+    """Return distinct non-empty article categories sorted alphabetically."""
+    cats = await db["articles"].distinct("category", {"status": {"$nin": ["draft", "scheduled"]}})
+    return sorted([c for c in cats if c])
+
+
 @app.get("/api/articles")
 async def get_articles(
     published_only: bool = True,
@@ -430,6 +444,12 @@ class ContactForm(BaseModel):
     service: Optional[str] = ""        # funnel: service category chosen
     service_options: Optional[List[str]] = []  # funnel: specific options chosen
 
+def _esc(text: str) -> str:
+    """Escape HTML special chars to prevent injection in emails."""
+    return (str(text)
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&#x27;"))
+
 @app.post("/api/contact/send")
 async def send_contact(form: ContactForm):
     if not SMTP_USER or not SMTP_PASS:
@@ -451,18 +471,19 @@ async def send_contact(form: ContactForm):
         f"Service : {form.service or 'Non renseigné'}\nOptions : {options_str}\n"
         f"Sujet : {form.subject or 'Non renseigné'}\n\nMessage :\n{form.message}"
     )
+    # All user-supplied values are HTML-escaped before being inserted in the email body
     html = (
         f'<html><body style="font-family:Arial,sans-serif;color:#333">'
         f'<h2 style="color:#1a56db">Nouveau message — Aide Numérique 37</h2>'
         f'<table style="border-collapse:collapse;width:100%">'
-        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Nom</td><td style="padding:8px;border:1px solid #e5e7eb">{form.name}</td></tr>'
-        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #e5e7eb"><a href="mailto:{form.email}">{form.email}</a></td></tr>'
-        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Téléphone</td><td style="padding:8px;border:1px solid #e5e7eb">{form.phone or "Non renseigné"}</td></tr>'
-        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Service</td><td style="padding:8px;border:1px solid #e5e7eb"><strong>{form.service or "Non renseigné"}</strong></td></tr>'
-        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Options</td><td style="padding:8px;border:1px solid #e5e7eb">{options_str}</td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Nom</td><td style="padding:8px;border:1px solid #e5e7eb">{_esc(form.name)}</td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #e5e7eb"><a href="mailto:{_esc(form.email)}">{_esc(form.email)}</a></td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Téléphone</td><td style="padding:8px;border:1px solid #e5e7eb">{_esc(form.phone or "Non renseigné")}</td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Service</td><td style="padding:8px;border:1px solid #e5e7eb"><strong>{_esc(form.service or "Non renseigné")}</strong></td></tr>'
+        f'<tr><td style="padding:8px;border:1px solid #e5e7eb;font-weight:bold">Options</td><td style="padding:8px;border:1px solid #e5e7eb">{_esc(options_str)}</td></tr>'
         f'</table>'
         f'<h3 style="color:#1a56db;margin-top:20px">Message</h3>'
-        f'<p style="background:#f9fafb;padding:16px;border-radius:8px;line-height:1.6">{form.message.replace(chr(10), "<br>")}</p>'
+        f'<p style="background:#f9fafb;padding:16px;border-radius:8px;line-height:1.6">{_esc(form.message).replace(chr(10), "<br>")}</p>'
         f'</body></html>'
     )
 
@@ -1231,8 +1252,10 @@ async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: 
         return {"status": "idle", "progress": 0, "total": 0}
     doc = await db["enrich_status"].find_one({"run_id": run_id})
     if not doc:
-        return {"status": "idle", "progress": 0, "total": 0}
+        return {"found": False, "status": "idle", "progress": 0, "total": 0}
     return {
+        "found": True,
+        "run_id": doc.get("run_id"),
         "status": doc.get("status", "idle"),
         "progress": doc.get("progress", 0),
         "processed": doc.get("processed", 0),
@@ -1243,14 +1266,64 @@ async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: 
 
 @app.post("/api/admin/articles/update-years")
 async def admin_update_years(authorization: Optional[str] = Header(None)):
+    """Replace outdated year references (2022-2024) with current year in all article content."""
     _check_admin(authorization)
-    return {"success": True, "message": "Mise à jour des années non disponible sans clé API IA"}
+    import re as _re
+    current_year = str(datetime.now(timezone.utc).year)
+    # Years to replace: anything 2020–(current_year-1)
+    old_years = [str(y) for y in range(2020, int(current_year))]
+    pattern = r'\b(' + '|'.join(old_years) + r')\b'
+
+    articles = await db["articles"].find(
+        {}, {"slug": 1, "content": 1, "content_html": 1}
+    ).to_list(length=2000)
+
+    updated = 0
+    for art in articles:
+        slug = art.get("slug", "")
+        changes: dict = {}
+        for field in ("content", "content_html"):
+            raw = art.get(field, "") or ""
+            if not raw:
+                continue
+            new_val, count = _re.subn(pattern, current_year, raw)
+            if count:
+                changes[field] = new_val
+        if changes:
+            changes["date_modified"] = _now()
+            await db["articles"].update_one({"slug": slug}, {"$set": changes})
+            updated += 1
+
+    return {
+        "success": True,
+        "updated": updated,
+        "message": f"{updated} article(s) mis à jour avec l'année {current_year}."
+    }
 
 
 @app.post("/api/admin/articles/fix-broken-links")
 async def admin_fix_broken_links(authorization: Optional[str] = Header(None)):
+    """Scan articles for internal links and report broken slugs (no auto-fix — WordPress is gone)."""
     _check_admin(authorization)
-    return {"success": True, "message": "Fix des liens non disponible sans clé API IA"}
+    import re as _re
+    articles = await db["articles"].find({}, {"slug": 1, "content": 1, "content_html": 1, "title": 1}).to_list(length=2000)
+    all_slugs = {a["slug"] for a in articles}
+
+    broken = []
+    for art in articles:
+        raw = art.get("content") or art.get("content_html") or ""
+        # Find href="/articles/SLUG" or href="…/articles/SLUG"
+        hrefs = _re.findall(r'href=["\'][^"\']*?/articles/([a-z0-9\-]+)["\']', raw)
+        for linked_slug in hrefs:
+            if linked_slug not in all_slugs:
+                broken.append({"article": art["slug"], "broken_slug": linked_slug})
+
+    return {
+        "success": True,
+        "broken_count": len(broken),
+        "broken_links": broken[:50],  # cap at 50
+        "message": f"{len(broken)} lien(s) interne(s) cassé(s) trouvé(s)." if broken else "Aucun lien interne cassé détecté ✓"
+    }
 
 
 @app.post("/api/admin/articles/{slug}/generate-image")

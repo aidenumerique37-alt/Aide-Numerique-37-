@@ -1051,49 +1051,156 @@ Réponds UNIQUEMENT en JSON : {{"meta_title": "...", "meta_description": "..."}}
     return {"success": True, "updated": updated, "total": len(articles), "errors": errors}
 
 
-@app.post("/api/admin/articles/auto-enrich")
-async def admin_auto_enrich(data: dict, authorization: Optional[str] = Header(None)):
-    _check_admin(authorization)
-    run_id = str(uuid.uuid4())
-    master_prompt = data.get("master_prompt", "")
-    limit = int(data.get("limit", 10))
+# ── AI / Generator config (master prompt + generation settings) ───────────────
+_GENERATOR_CONFIG_DEFAULTS = {
+    "master_prompt": "",
+    "default_category": "Conseils & Astuces",
+    "generate_image": True,
+}
 
-    # Pick articles to enrich (those without tags or with short content)
-    articles = await db["articles"].find({}).to_list(length=500)
-    to_enrich = [a for a in articles if not a.get("tags") or len(a.get("tags", [])) == 0][:limit]
+@app.get("/api/admin/generator/config")
+async def get_generator_config(authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    doc = await db["generator_config"].find_one({"_id": "main"})
+    cfg = {**_GENERATOR_CONFIG_DEFAULTS, **(doc or {})}
+    cfg.pop("_id", None)
+    return cfg
+
+@app.put("/api/admin/generator/config")
+async def save_generator_config(request: Request, authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    data = await request.json()
+    allowed = {"master_prompt", "default_category", "generate_image"}
+    update = {k: v for k, v in data.items() if k in allowed}
+    update["updated_at"] = _now()
+    await db["generator_config"].update_one(
+        {"_id": "main"}, {"$set": update}, upsert=True
+    )
+    return {"success": True}
+
+# Legacy alias kept for compatibility
+@app.get("/api/admin/ai-config")
+async def get_ai_config(authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    doc = await db["generator_config"].find_one({"_id": "main"})
+    return {"master_prompt": (doc or {}).get("master_prompt", "")}
+
+@app.put("/api/admin/ai-config")
+async def save_ai_config(request: Request, authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    data = await request.json()
+    await db["generator_config"].update_one(
+        {"_id": "main"},
+        {"$set": {"master_prompt": data.get("master_prompt", ""), "updated_at": _now()}},
+        upsert=True,
+    )
+    return {"success": True}
+
+
+@app.post("/api/admin/articles/auto-enrich")
+async def admin_auto_enrich(request: Request, authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    data = await request.json()
+    run_id = str(uuid.uuid4())
+
+    # Support both old {limit} and new {max_articles} param names
+    max_articles = int(data.get("max_articles", data.get("limit", 10)))
+
+    # master_prompt: from request, fallback to saved generator config
+    master_prompt = data.get("master_prompt", "").strip()
+    if not master_prompt:
+        cfg = await db["generator_config"].find_one({"_id": "main"})
+        master_prompt = (cfg or {}).get("master_prompt", "")
+
+    DEFAULT_SYSTEM = (
+        "Tu es un expert en rédaction web SEO pour Aide Numérique 37, "
+        "une entreprise d'assistance informatique à domicile en Indre-et-Loire (37). "
+        "Rédige en français, style clair, humain, bienveillant, accessible aux seniors. "
+        "Pas de jargon inutile."
+    )
+    system = master_prompt if master_prompt else DEFAULT_SYSTEM
+
+    # Select articles missing content (priority) or missing meta
+    all_articles = await db["articles"].find({}).to_list(length=500)
+    no_content  = [a for a in all_articles if not a.get("content", "").strip()]
+    has_content = [a for a in all_articles if a.get("content", "").strip()
+                   and (not a.get("meta_title") or not a.get("meta_description"))]
+    to_enrich = (no_content + has_content)[:max_articles]
 
     await db["enrich_status"].update_one(
         {"run_id": run_id},
-        {"$set": {"run_id": run_id, "status": "running", "progress": 0, "total": len(to_enrich), "started_at": _now()}},
-        upsert=True
+        {"$set": {"run_id": run_id, "status": "running", "progress": 0,
+                  "total": len(to_enrich), "started_at": _now(), "report": []}},
+        upsert=True,
     )
 
     async def _do_enrich():
-        import re as _re, json as _json, re as _re2
-        system = master_prompt if master_prompt else (
-            "Tu es un expert SEO pour un site d'aide numérique en Indre-et-Loire. Langue : français."
-        )
+        import re as _re, json as _json
         done = 0
+        report = []
         for art in to_enrich:
+            slug = art.get("slug", "")
+            title = art.get("title", slug)
             try:
-                plain = _re.sub(r"<[^>]+>", "", art.get("content", ""))[:800]
-                prompt = f"""Pour l'article "{art.get('title', '')}", génère 3 à 5 tags pertinents (mots-clés courts).
-Réponds UNIQUEMENT en JSON : {{"tags": ["tag1", "tag2", "tag3"]}}"""
-                raw = await _claude(prompt, system=system, max_tokens=100)
-                match = _re2.search(r"\{.*\}", raw, _re2.DOTALL)
-                if match:
-                    result = _json.loads(match.group())
-                    tags = result.get("tags", [])
-                    await db["articles"].update_one(
-                        {"slug": art["slug"]},
-                        {"$set": {"tags": tags, "updated_at": _now()}}
+                existing_content = art.get("content", "").strip()
+
+                # ── Step 1: generate full content if missing ──────────────────
+                if not existing_content:
+                    content_prompt = (
+                        f'Rédige un article de blog complet et optimisé SEO intitulé : "{title}"\n\n'
+                        f"L'article doit :\n"
+                        f"- Avoir une introduction engageante (2-3 paragraphes)\n"
+                        f"- Être structuré avec des sous-titres H2 et H3\n"
+                        f"- Contenir entre 600 et 900 mots\n"
+                        f"- Inclure des conseils pratiques et concrets\n"
+                        f"- Se terminer par une conclusion avec appel à l'action doux\n\n"
+                        f"Retourne UNIQUEMENT le HTML (<h2>,<h3>,<p>,<ul>,<li>,<strong>). Pas de balise html/body."
                     )
-                done += 1
-                await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"progress": done}})
-            except Exception:
-                done += 1
-                await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"progress": done}})
-        await db["enrich_status"].update_one({"run_id": run_id}, {"$set": {"status": "done"}})
+                    new_content = await _claude(content_prompt, system=system, max_tokens=2000)
+                    plain = _re.sub(r"<[^>]+>", "", new_content)
+                    excerpt = (plain.strip()[:160].rsplit(" ", 1)[0] + "…") if len(plain) > 160 else plain.strip()
+                    await db["articles"].update_one(
+                        {"slug": slug},
+                        {"$set": {"content": new_content, "excerpt": excerpt, "updated_at": _now()}}
+                    )
+                    existing_content = new_content
+
+                # ── Step 2: generate meta + tags ──────────────────────────────
+                plain = _re.sub(r"<[^>]+>", "", existing_content)[:1000]
+                meta_prompt = (
+                    f'Pour l\'article "{title}", génère :\n'
+                    f"1. meta_title SEO (50-60 car.)\n"
+                    f"2. meta_description SEO (150-160 car., appel à l'action)\n"
+                    f"3. tags : liste de 3 à 5 mots-clés courts\n\n"
+                    f"Contenu (extrait) : {plain}\n\n"
+                    f"Réponds UNIQUEMENT en JSON valide :\n"
+                    f'{{"meta_title":"...","meta_description":"...","tags":["tag1","tag2"]}}'
+                )
+                raw = await _claude(meta_prompt, system=system, max_tokens=300)
+                match = _re.search(r"\{.*\}", raw, _re.DOTALL)
+                if match:
+                    meta = _json.loads(match.group())
+                    update_fields = {"updated_at": _now()}
+                    if meta.get("meta_title"):    update_fields["meta_title"]    = meta["meta_title"]
+                    if meta.get("meta_description"): update_fields["meta_description"] = meta["meta_description"]
+                    if meta.get("tags"):          update_fields["tags"]          = meta["tags"]
+                    await db["articles"].update_one({"slug": slug}, {"$set": update_fields})
+
+                report.append({"slug": slug, "title": title, "status": "ok",
+                                "generated_content": not art.get("content", "").strip()})
+            except Exception as e:
+                report.append({"slug": slug, "title": title, "status": "error", "error": str(e)})
+
+            done += 1
+            await db["enrich_status"].update_one(
+                {"run_id": run_id},
+                {"$set": {"progress": done, "processed": done, "report": report}}
+            )
+
+        await db["enrich_status"].update_one(
+            {"run_id": run_id},
+            {"$set": {"status": "done", "progress": done, "report": report}}
+        )
 
     asyncio.create_task(_do_enrich())
     return {"success": True, "run_id": run_id, "total": len(to_enrich)}
@@ -1103,11 +1210,23 @@ Réponds UNIQUEMENT en JSON : {{"tags": ["tag1", "tag2", "tag3"]}}"""
 async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
     if not run_id:
+        # Return most recent run if any
+        doc = await db["enrich_status"].find_one({}, sort=[("started_at", -1)])
+        if doc and doc.get("status") == "running":
+            return {"found": True, "run_id": doc.get("run_id"), "status": "running",
+                    "progress": doc.get("progress", 0), "processed": doc.get("processed", 0),
+                    "total": doc.get("total", 0), "report": doc.get("report", [])}
         return {"status": "idle", "progress": 0, "total": 0}
     doc = await db["enrich_status"].find_one({"run_id": run_id})
     if not doc:
         return {"status": "idle", "progress": 0, "total": 0}
-    return {"status": doc.get("status", "idle"), "progress": doc.get("progress", 0), "total": doc.get("total", 0)}
+    return {
+        "status": doc.get("status", "idle"),
+        "progress": doc.get("progress", 0),
+        "processed": doc.get("processed", 0),
+        "total": doc.get("total", 0),
+        "report": doc.get("report", []),
+    }
 
 
 @app.post("/api/admin/articles/update-years")

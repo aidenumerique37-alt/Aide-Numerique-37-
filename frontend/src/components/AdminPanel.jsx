@@ -164,12 +164,18 @@ const AdminPanel = () => {
     const threshold = opts.threshold ?? 3;
     const max_articles = opts.max_articles ?? 10;
     const regenerate_images = opts.regenerate_images ?? false;
-    if (!window.confirm(`Lancer l'enrichissement automatique des articles ≤${threshold}/5 (max ${max_articles} articles, ~30-90 s/article) ?\n\nClaude va régénérer : contenu, meta_title, meta_description pour chaque article déficient.`)) return;
+    if (!window.confirm(`Lancer l'enrichissement automatique des articles (max ${max_articles} articles, ~30-90 s/article) ?\n\nClaude va générer : contenu complet, meta_title, meta_description, tags pour chaque article déficient.`)) return;
+    // Fetch saved master_prompt from DB before launching
+    let master_prompt = '';
+    try {
+      const cfgRes = await axios.get(`${BACKEND_URL}/api/admin/generator/config`, { headers: getAuthHeaders() });
+      master_prompt = cfgRes.data?.master_prompt || '';
+    } catch (_) {}
     setAutoEnrichLaunching(true);
     try {
       const res = await axios.post(
         `${BACKEND_URL}/api/admin/articles/auto-enrich`,
-        { threshold, max_articles, regenerate_images },
+        { threshold, max_articles, regenerate_images, master_prompt },
         { headers: getAuthHeaders(), timeout: 15000 }
       );
       if (res.data.success) {

@@ -43,9 +43,31 @@ GOOGLE_PLACE_ID= os.getenv("GOOGLE_PLACE_ID", "")
 WP_BASE_URL    = os.getenv("WP_BASE_URL", "https://www.aidenumerique37.fr")
 SITE_URL       = os.getenv("SITE_URL", "https://www.aidenumerique37.fr")
 UPLOADS_DIR    = Path(os.getenv("UPLOADS_DIR", "/app/uploads"))
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_API_KEY     = os.getenv("ANTHROPIC_API_KEY", "")
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY    = os.getenv("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── Cloudinary config ─────────────────────────────────────────────────────────
+_CLOUDINARY_AVAILABLE = False
+try:
+    import cloudinary
+    import cloudinary.uploader
+    if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+        cloudinary.config(
+            cloud_name=CLOUDINARY_CLOUD_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET,
+            secure=True,
+        )
+        _CLOUDINARY_AVAILABLE = True
+        print("[cloudinary] Cloudinary configured ✓")
+    else:
+        print("[cloudinary] Cloudinary env vars missing — uploads will fall back to MongoDB base64")
+except ImportError:
+    print("[cloudinary] cloudinary package not installed")
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Aide Numérique 37 API", version="1.0.0")
@@ -236,6 +258,33 @@ async def _claude(prompt: str, system: str = "", max_tokens: int = 4096) -> str:
         kwargs["system"] = system
     response = await client.messages.create(**kwargs)
     return response.content[0].text
+
+# ── Cloudinary upload helper ──────────────────────────────────────────────────
+async def _upload_to_cloudinary(content: bytes, filename: str, folder: str = "aidenumerique37") -> dict:
+    """Upload bytes to Cloudinary in a thread (SDK is synchronous). Returns {url, public_id}."""
+    import io
+    def _sync_upload():
+        result = cloudinary.uploader.upload(
+            io.BytesIO(content),
+            folder=folder,
+            public_id=Path(filename).stem,
+            overwrite=False,
+            resource_type="auto",
+        )
+        return result
+    result = await asyncio.to_thread(_sync_upload)
+    return {"url": result["secure_url"], "public_id": result["public_id"]}
+
+
+async def _delete_from_cloudinary(public_id: str):
+    """Delete a resource from Cloudinary by public_id (best-effort, non-fatal)."""
+    try:
+        def _sync_delete():
+            cloudinary.uploader.destroy(public_id, resource_type="image")
+        await asyncio.to_thread(_sync_delete)
+    except Exception as e:
+        print(f"[cloudinary] delete {public_id} failed (non-fatal): {e}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PUBLIC ROUTES
@@ -434,16 +483,21 @@ async def send_contact(form: ContactForm):
     return {"success": True, "message": "Message envoyé avec succès"}
 
 
-# ── Static uploads — served from MongoDB (persistent) ─────────────────────────
+# ── Static uploads — Cloudinary redirect or MongoDB fallback ──────────────────
 @app.get("/api/uploads/{filename}")
 async def serve_upload(filename: str):
-    # Try MongoDB first (persistent storage)
     doc = await db["media"].find_one({"filename": filename})
-    if doc and doc.get("data_b64"):
-        import base64
-        data = base64.b64decode(doc["data_b64"])
-        mime = doc.get("mime", "application/octet-stream")
-        return Response(content=data, media_type=mime)
+    if doc:
+        # Prefer Cloudinary CDN URL (no bandwidth cost, fast CDN)
+        if doc.get("cloudinary_url"):
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=doc["cloudinary_url"], status_code=302)
+        # Legacy: base64 stored in MongoDB
+        if doc.get("data_b64"):
+            import base64
+            data = base64.b64decode(doc["data_b64"])
+            mime = doc.get("mime", "application/octet-stream")
+            return Response(content=data, media_type=mime)
     # Fallback: filesystem (local dev)
     path = UPLOADS_DIR / filename
     if path.exists():
@@ -1407,23 +1461,37 @@ async def upload_file(
     prefix = "ai_" if context == "ai" else ""
     filename = f"{prefix}{uuid.uuid4().hex}{ext}"
 
-    import base64
-    data_b64 = base64.b64encode(content).decode("utf-8")
+    meta: dict = {
+        "filename": filename, "category": category, "context": context,
+        "original_name": file.filename, "size": len(content), "mime": mime,
+        "created_at": _now(),
+    }
 
-    url = f"/api/uploads/{filename}"
-    # Store file content in MongoDB (persistent — survives Railway restarts)
-    meta = {"filename": filename, "url": url, "category": category, "context": context,
-            "original_name": file.filename, "size": len(content), "mime": mime,
-            "data_b64": data_b64, "created_at": _now()}
+    if _CLOUDINARY_AVAILABLE:
+        try:
+            cld = await _upload_to_cloudinary(content, filename)
+            meta["cloudinary_url"] = cld["url"]
+            meta["cloudinary_public_id"] = cld["public_id"]
+            meta["url"] = cld["url"]
+        except Exception as e:
+            print(f"[cloudinary] upload failed, falling back to base64: {e}")
+            import base64
+            meta["data_b64"] = base64.b64encode(content).decode("utf-8")
+            meta["url"] = f"/api/uploads/{filename}"
+    else:
+        import base64
+        meta["data_b64"] = base64.b64encode(content).decode("utf-8")
+        meta["url"] = f"/api/uploads/{filename}"
+
     await db["media"].insert_one(meta)
 
-    # Also write to filesystem as cache (best-effort)
+    # Also write to filesystem as cache (best-effort, local dev)
     try:
         (UPLOADS_DIR / filename).write_bytes(content)
     except Exception:
         pass
 
-    return {"url": url, "filename": filename}
+    return {"url": meta["url"], "filename": filename}
 
 
 @app.post("/api/upload/multiple")
@@ -1439,7 +1507,6 @@ async def upload_multiple_files(
                 ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
                 ".mp4": "video/mp4", ".webm": "video/webm", ".pdf": "application/pdf"}
     results = []
-    import base64
     for file in files:
         ext = Path(file.filename).suffix.lower() if file.filename else ".bin"
         if ext not in allowed:
@@ -1449,24 +1516,43 @@ async def upload_multiple_files(
         mime = mime_map.get(ext, "application/octet-stream")
         prefix = "ai_" if context == "ai" else ""
         filename = f"{prefix}{uuid.uuid4().hex}{ext}"
-        data_b64 = base64.b64encode(content).decode("utf-8")
-        url = f"/api/uploads/{filename}"
-        meta = {"filename": filename, "url": url, "category": category, "context": context,
-                "original_name": file.filename, "size": len(content), "mime": mime,
-                "data_b64": data_b64, "created_at": _now()}
+
+        meta: dict = {
+            "filename": filename, "category": category, "context": context,
+            "original_name": file.filename, "size": len(content), "mime": mime,
+            "created_at": _now(),
+        }
+
+        if _CLOUDINARY_AVAILABLE:
+            try:
+                cld = await _upload_to_cloudinary(content, filename)
+                meta["cloudinary_url"] = cld["url"]
+                meta["cloudinary_public_id"] = cld["public_id"]
+                meta["url"] = cld["url"]
+            except Exception as e:
+                print(f"[cloudinary] upload {filename} failed, falling back to base64: {e}")
+                import base64
+                meta["data_b64"] = base64.b64encode(content).decode("utf-8")
+                meta["url"] = f"/api/uploads/{filename}"
+        else:
+            import base64
+            meta["data_b64"] = base64.b64encode(content).decode("utf-8")
+            meta["url"] = f"/api/uploads/{filename}"
+
         await db["media"].insert_one(meta)
         try:
             (UPLOADS_DIR / filename).write_bytes(content)
         except Exception:
             pass
-        results.append({"url": url, "filename": filename, "original_name": file.filename})
+        results.append({"url": meta["url"], "filename": filename, "original_name": file.filename})
     return {"uploaded": len([r for r in results if "url" in r]), "total": len(files), "results": results}
 
 
 @app.get("/api/upload/gallery")
 async def get_gallery(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    docs = await db["media"].find({}).sort("created_at", -1).to_list(length=500)
+    # Exclude data_b64 from projection — never send MBs of base64 to frontend
+    docs = await db["media"].find({}, {"data_b64": 0}).sort("created_at", -1).to_list(length=500)
     return [_strip_mongo(d) for d in docs]
 
 
@@ -1476,6 +1562,10 @@ async def delete_upload(filename: str, authorization: Optional[str] = Header(Non
     path = UPLOADS_DIR / filename
     if path.exists():
         path.unlink()
+    # Also delete from Cloudinary if applicable
+    doc = await db["media"].find_one({"filename": filename})
+    if doc and doc.get("cloudinary_public_id") and _CLOUDINARY_AVAILABLE:
+        await _delete_from_cloudinary(doc["cloudinary_public_id"])
     await db["media"].delete_one({"filename": filename})
     return {"success": True}
 

@@ -200,14 +200,9 @@ async def _seed_db_if_empty():
 
 # ── APScheduler ───────────────────────────────────────────────────────────────
 def _start_scheduler():
-    try:
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        scheduler = AsyncIOScheduler(timezone="Europe/Paris")
-        scheduler.add_job(_sync_wordpress_task, "cron", hour=3, minute=0, id="wp_sync")
-        scheduler.start()
-        print("[scheduler] WordPress sync scheduled at 03:00 Paris time")
-    except Exception as e:
-        print(f"[scheduler] Could not start: {e}")
+    # WordPress sync job removed — WordPress is being decommissioned.
+    # Manual sync still available via POST /api/sync-wordpress if needed.
+    print("[scheduler] No scheduled jobs (WordPress sync removed)")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -1914,6 +1909,58 @@ async def _sync_wordpress_task():
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH CHECK
 # ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/admin/articles/content-audit")
+async def admin_content_audit(authorization: Optional[str] = Header(None)):
+    """Report on how many articles have real body content vs empty."""
+    _check_admin(authorization)
+    total     = await db["articles"].count_documents({})
+    has_html  = await db["articles"].count_documents({"content_html": {"$exists": True, "$nin": [None, ""]}})
+    has_plain = await db["articles"].count_documents({"content":      {"$exists": True, "$nin": [None, ""]}})
+    has_any   = await db["articles"].count_documents({"$or": [
+        {"content_html": {"$exists": True, "$nin": [None, ""]}},
+        {"content":      {"$exists": True, "$nin": [None, ""]}},
+    ]})
+    empty     = total - has_any
+    by_source = {}
+    for src in ["wordpress", "ai_generated", None]:
+        q = {"source": src} if src else {"source": {"$exists": False}}
+        c = await db["articles"].count_documents(q)
+        if c: by_source[src or "unknown"] = c
+    by_status = {}
+    for st in ["published", "draft", "scheduled", None]:
+        q = {"status": st} if st else {"status": {"$exists": False}}
+        c = await db["articles"].count_documents(q)
+        if c: by_status[st or "unknown"] = c
+    # Sample of empty articles (first 5)
+    empty_samples = await db["articles"].find(
+        {"content_html": {"$in": [None, ""]}, "content": {"$in": [None, ""]}},
+        {"slug": 1, "title": 1, "source": 1, "status": 1}
+    ).limit(5).to_list(5)
+    return {
+        "total": total,
+        "with_content": has_any,
+        "with_content_html": has_html,
+        "with_content_field": has_plain,
+        "empty_content": empty,
+        "by_source": by_source,
+        "by_status": by_status,
+        "empty_samples": [_strip_mongo(d) for d in empty_samples],
+    }
+
+
+@app.get("/api/admin/articles/export-backup")
+async def admin_export_backup(authorization: Optional[str] = Header(None)):
+    """Export all articles as JSON (including content) — use to create a local backup."""
+    _check_admin(authorization)
+    docs = await db["articles"].find({}).to_list(length=5000)
+    cleaned = [_strip_mongo(d) for d in docs]
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content=cleaned,
+        headers={"Content-Disposition": "attachment; filename=articles_backup.json"},
+    )
+
 
 @app.get("/api/health")
 async def health():

@@ -329,7 +329,14 @@ async def get_article(slug: str):
     doc = await db["articles"].find_one({"slug": slug})
     if not doc:
         raise HTTPException(status_code=404, detail="Article not found")
-    return _strip_mongo(doc)
+    doc = _strip_mongo(doc)
+    # Normalise: expose both fields so frontend works regardless of article origin
+    # WordPress articles store body in content_html, Claude articles in content
+    if not doc.get("content_html") and doc.get("content"):
+        doc["content_html"] = doc["content"]
+    elif not doc.get("content") and doc.get("content_html"):
+        doc["content"] = doc["content_html"]
+    return doc
 
 
 # ── Services (public) ─────────────────────────────────────────────────────────
@@ -979,6 +986,11 @@ async def admin_update_article(slug: str, data: dict, authorization: Optional[st
     _check_admin(authorization)
     data.pop("_id", None)
     data["date_modified"] = _now()
+    # Keep content and content_html in sync so both article origins work on the public site
+    if "content" in data and not data.get("content_html"):
+        data["content_html"] = data["content"]
+    elif "content_html" in data and not data.get("content"):
+        data["content"] = data["content_html"]
     result = await db["articles"].update_one({"slug": slug}, {"$set": data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -1300,8 +1312,13 @@ async def admin_regenerate_article(slug: str, data: dict = {}, authorization: Op
     async def _do_regen():
         try:
             import re as _re
-            plain = _re.sub(r"<[^>]+>", "", article.get("content", ""))[:1200]
+            # Read from whichever content field exists
+            raw = article.get("content") or article.get("content_html") or ""
+            plain = _re.sub(r"<[^>]+>", "", raw)[:1200]
             master_prompt = data.get("master_prompt", "")
+            if not master_prompt:
+                cfg = await db["generator_config"].find_one({"_id": "main"})
+                master_prompt = (cfg or {}).get("master_prompt", "")
             system = master_prompt if master_prompt else (
                 "Tu es un expert en rédaction web SEO pour une entreprise d'aide numérique en Indre-et-Loire (37). "
                 "Style : clair, humain, professionnel. Langue : français."
@@ -1315,11 +1332,17 @@ Retourne UNIQUEMENT le contenu HTML amélioré (<h2>, <h3>, <p>, <ul>, <li>, <st
             new_content = await _claude(prompt, system=system, max_tokens=2000)
             plain2 = _re.sub(r"<[^>]+>", "", new_content)
             excerpt = plain2.strip()[:160].rsplit(" ", 1)[0] + "…" if len(plain2) > 160 else plain2.strip()
+            now = _now()
+            # Write to both fields so both article origins work on the public site
             await db["articles"].update_one(
                 {"slug": slug},
-                {"$set": {"content": new_content, "excerpt": excerpt, "updated_at": _now()}}
+                {"$set": {"content": new_content, "content_html": new_content,
+                           "excerpt": excerpt, "date_modified": now, "updated_at": now}}
             )
-            await db["regen_status"].update_one({"slug": slug}, {"$set": {"status": "done", "run_id": run_id}})
+            await db["regen_status"].update_one(
+                {"slug": slug},
+                {"$set": {"status": "done", "run_id": run_id, "done": True}}
+            )
         except Exception as e:
             await db["regen_status"].update_one({"slug": slug}, {"$set": {"status": "error", "error": str(e)}})
 
@@ -1332,8 +1355,18 @@ async def admin_regeneration_status(slug: str, authorization: Optional[str] = He
     _check_admin(authorization)
     doc = await db["regen_status"].find_one({"slug": slug})
     if not doc:
-        return {"status": "idle"}
-    return {"status": doc.get("status", "idle"), "run_id": doc.get("run_id"), "error": doc.get("error")}
+        return {"status": "idle", "done": False}
+    status = doc.get("status", "idle")
+    response: dict = {"status": status, "run_id": doc.get("run_id"), "error": doc.get("error"), "done": False}
+    if status == "done":
+        response["done"] = True
+        # Return the updated article so the frontend can refresh without extra request
+        art = await db["articles"].find_one({"slug": slug})
+        if art:
+            response["article"] = _strip_mongo(art)
+            if not response["article"].get("content_html") and response["article"].get("content"):
+                response["article"]["content_html"] = response["article"]["content"]
+    return response
 
 
 @app.post("/api/admin/generate-article")
@@ -1383,19 +1416,24 @@ Retourne UNIQUEMENT le contenu de l'article en HTML (utilise <h2>, <h3>, <p>, <u
     plain = _re.sub(r"<[^>]+>", "", html_content)
     excerpt = plain.strip()[:160].rsplit(" ", 1)[0] + "…" if len(plain) > 160 else plain.strip()
 
+    now = _now()
     article = {
         "slug": slug,
         "title": title,
-        "content": html_content,
+        "content": html_content,        # Claude-origin field
+        "content_html": html_content,   # WordPress-origin field — kept in sync
         "excerpt": excerpt,
         "category": data.get("default_category", "Conseils & Astuces"),
         "tags": [],
-        "status": "draft",
+        "status": "published",          # Published immediately so it's visible on the public site
+        "source": "ai_generated",
         "featured_image": "",
         "meta_title": title,
         "meta_description": excerpt,
-        "created_at": _now(),
-        "updated_at": _now(),
+        "date_published": now,
+        "date_modified": now,
+        "created_at": now,
+        "updated_at": now,
         "ai_generated": True,
     }
     await db["articles"].insert_one(article)

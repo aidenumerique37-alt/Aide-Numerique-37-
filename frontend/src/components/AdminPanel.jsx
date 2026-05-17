@@ -704,7 +704,7 @@ const AdminPanel = () => {
   const syncArticles = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${BACKEND_URL}/api/admin/articles/sync`, {}, {
+      const res = await axios.post(`${BACKEND_URL}/api/sync-wordpress`, {}, {
         headers: getAuthHeaders()
       });
       showStatus('success', res.data.message);

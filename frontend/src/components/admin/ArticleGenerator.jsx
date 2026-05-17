@@ -428,12 +428,15 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
               {results.map((art, i) => (
                 <div key={i} className="bg-white border border-green-200 rounded-xl p-3 flex gap-3" data-testid={`generated-article-${i}`}>
                   {art.image_url && <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-50">
-                    <img src={`${BACKEND_URL}${art.image_url}`} alt={art.title} className="w-full h-full object-cover" />
+                    <img src={art.image_url?.startsWith('http') ? art.image_url : `${BACKEND_URL}${art.image_url}`} alt={art.title} className="w-full h-full object-cover" />
                   </div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{art.title}</h4>
-                      <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">Publié</span>
+                      {art.status === 'published'
+                        ? <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">Publié</span>
+                        : <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">{art.status === 'draft' ? 'Brouillon' : art.status}</span>
+                      }
                     </div>
                     <p className="text-xs text-gray-500">{art.category} · /articles/{art.slug}</p>
                     <a href={`/articles/${art.slug}`} target="_blank" rel="noreferrer"

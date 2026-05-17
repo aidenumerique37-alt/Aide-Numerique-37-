@@ -94,11 +94,13 @@ const BlogDetail = () => {
       setLoading(true);
       const response = await axios.get(`${BACKEND_URL}/api/articles/${slug}`);
       const data = response.data;
-      const contentHtml = data.content_html || '';
+      // content_html = WordPress articles, content = Claude-generated articles
+      const contentHtml = data.content_html || data.content || '';
       setReadingTime(Math.ceil(contentHtml.replace(/<[^>]*>/g, '').split(/\s+/).length / 200));
       setArticle({
         title: decodeHtmlEntities(data.title), content: contentHtml, excerpt: data.excerpt || '',
         slug: data.slug, category: data.category || 'Conseils & Astuces',
+        status: data.status || 'published',
         created_at: data.date_published, updated_at: data.date_modified || data.date_published,
         author_name: data.author || 'Pierrick', featured_image: data.image_url, yoast_seo: data.yoast_seo,
         canonical_url: data.canonical_url || null, video_url: data.video_url || null

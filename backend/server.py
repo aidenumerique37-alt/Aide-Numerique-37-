@@ -87,34 +87,42 @@ async def shutdown():
 DATA_DIR = Path(__file__).parent / "data"
 
 async def _seed_db_if_empty():
-    list_collections = {
-        "articles":   "articles.json",
-        "services":   "services.json",
-        "cities":     "cities.json",
-        "partners":   "partners.json",
-        "city_pages": "city_pages.json",
-        "portfolio":  "portfolio.json",
-    }
-    for col, fname in list_collections.items():
-        count = await db[col].count_documents({})
-        if count == 0:
-            fpath = DATA_DIR / fname
-            if fpath.exists():
-                data = json.loads(fpath.read_text(encoding="utf-8"))
-                if isinstance(data, list) and data:
-                    # Ensure all elements are plain dicts
-                    docs = [d if isinstance(d, dict) else {"value": d} for d in data]
-                    await db[col].insert_many(docs)
-                    print(f"[seed] {col}: {len(docs)} documents")
+    try:
+        list_collections = {
+            "articles":   "articles.json",
+            "services":   "services.json",
+            "cities":     "cities.json",
+            "partners":   "partners.json",
+            "city_pages": "city_pages.json",
+            "portfolio":  "portfolio.json",
+        }
+        for col, fname in list_collections.items():
+            count = await db[col].count_documents({})
+            if count == 0:
+                fpath = DATA_DIR / fname
+                if fpath.exists():
+                    data = json.loads(fpath.read_text(encoding="utf-8"))
+                    if isinstance(data, list) and data:
+                        docs = [d if isinstance(d, dict) else {"value": d} for d in data]
+                        try:
+                            await db[col].insert_many(docs)
+                            print(f"[seed] {col}: {len(docs)} documents")
+                        except Exception as e:
+                            print(f"[seed] {col}: skipped (DB may be read-only): {e}")
 
-    # Seed partner categories (stored as single doc with items array)
-    if not await db["partner_categories"].find_one({"_id": "categories"}):
-        fpath = DATA_DIR / "partner_categories.json"
-        if fpath.exists():
-            cats = json.loads(fpath.read_text(encoding="utf-8"))
-            items = [c for c in cats if isinstance(c, str) and not c.startswith("TEST") and not c.startswith("Duplicate")]
-            await db["partner_categories"].insert_one({"_id": "categories", "items": items})
-            print(f"[seed] partner_categories: {len(items)} items")
+        # Seed partner categories
+        if not await db["partner_categories"].find_one({"_id": "categories"}):
+            fpath = DATA_DIR / "partner_categories.json"
+            if fpath.exists():
+                cats = json.loads(fpath.read_text(encoding="utf-8"))
+                items = [c for c in cats if isinstance(c, str) and not c.startswith("TEST") and not c.startswith("Duplicate")]
+                try:
+                    await db["partner_categories"].insert_one({"_id": "categories", "items": items})
+                    print(f"[seed] partner_categories: {len(items)} items")
+                except Exception as e:
+                    print(f"[seed] partner_categories: skipped (DB may be read-only): {e}")
+    except Exception as e:
+        print(f"[seed] seed_db_if_empty failed (non-fatal): {e}")
 
     # Seed site content
     DEFAULT_HERO = {
@@ -155,8 +163,11 @@ async def _seed_db_if_empty():
         if not hero.get("title") and not hero.get("title_highlight"):
             restore = {f"hero.{k}": v for k, v in DEFAULT_HERO.items() if not hero.get(k)}
             if restore:
-                await db["site_content"].update_one({"_id": "main"}, {"$set": restore})
-                print(f"[seed] site_content: restored {len(restore)} empty hero fields")
+                try:
+                    await db["site_content"].update_one({"_id": "main"}, {"$set": restore})
+                    print(f"[seed] site_content: restored {len(restore)} empty hero fields")
+                except Exception as e:
+                    print(f"[seed] site_content: could not restore hero fields (DB may be read-only): {e}")
 
 # ── APScheduler ───────────────────────────────────────────────────────────────
 def _start_scheduler():

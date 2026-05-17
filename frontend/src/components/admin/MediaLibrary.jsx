@@ -102,7 +102,7 @@ const MediaLibrary = () => {
   };
 
   const copyUrl = (url) => {
-    const full = `${BACKEND_URL}${url}`;
+    const full = url?.startsWith('http') ? url : `${BACKEND_URL}${url}`;
     navigator.clipboard.writeText(full).catch(() => {});
     setCopied(url);
     setTimeout(() => setCopied(null), 2000);
@@ -300,10 +300,10 @@ const MediaLibrary = () => {
             <div key={img.id || img.filename} className="group relative bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all" data-testid={`media-item-${img.filename}`}>
               <div className="aspect-square overflow-hidden bg-gray-50 relative">
                 {img.context === 'video' ? (
-                  <video src={`${BACKEND_URL}${img.url}`} className="w-full h-full object-cover" preload="metadata" muted />
+                  <video src={img.url?.startsWith('http') ? img.url : `${BACKEND_URL}${img.url}`} className="w-full h-full object-cover" preload="metadata" muted />
                 ) : (
                   <img
-                    src={`${BACKEND_URL}${img.url}`}
+                    src={img.url?.startsWith('http') ? img.url : `${BACKEND_URL}${img.url}`}
                     alt={img.label || img.filename}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     loading="lazy"

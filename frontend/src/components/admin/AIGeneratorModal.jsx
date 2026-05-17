@@ -52,7 +52,11 @@ const AIGeneratorModal = ({ onClose, onGenerated, context = "default" }) => {
       );
       setGeneratedUrl(res.data.url);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erreur lors de la génération. Réessayez.');
+      if (err.response?.status === 503) {
+        setError('__unavailable__');
+      } else {
+        setError(err.response?.data?.detail || 'Erreur lors de la génération. Réessayez.');
+      }
     } finally {
       setGenerating(false);
     }
@@ -112,12 +116,22 @@ const AIGeneratorModal = ({ onClose, onGenerated, context = "default" }) => {
             </div>
           </div>
 
-          {error && (
+          {error === '__unavailable__' ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+              <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                <Sparkles size={15} className="text-amber-500" />Génération IA non disponible
+              </p>
+              <p className="text-xs text-amber-700">
+                Cette fonctionnalité nécessite une clé API dédiée (ex: OpenAI / GPT Image).
+                Utilisez plutôt la <strong>Médiathèque</strong> pour uploader une image depuis votre ordinateur ou Cloudinary.
+              </p>
+            </div>
+          ) : error ? (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
               <AlertCircle size={16} className="text-red-500 shrink-0" />
               <p className="text-sm text-red-600">{error}</p>
             </div>
-          )}
+          ) : null}
 
           {generatedUrl && (
             <div className="space-y-3">

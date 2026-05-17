@@ -295,10 +295,12 @@ const ContactForm = () => {
                 <div className="space-y-1.5">
                   <Label htmlFor="phone" className="text-gray-700 dark:text-gray-300 text-sm font-medium">Téléphone *</Label>
                   <Input
-                    id="phone" required
+                    id="phone" required type="tel"
                     value={contact.phone}
                     onChange={e => setContact(p => ({ ...p, phone: e.target.value }))}
                     placeholder="07 61 50 35 85"
+                    pattern="[0-9\s.+\-()·]{10,16}"
+                    title="Numéro de téléphone valide (ex: 07 61 50 35 85)"
                     disabled={status === 'loading'}
                     className="border-gray-300 focus:border-french-blue"
                   />

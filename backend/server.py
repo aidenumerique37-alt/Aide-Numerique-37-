@@ -105,6 +105,7 @@ async def startup():
         print(f"[db] MongoDB connection FAILED: {e}")
         raise RuntimeError(f"Cannot connect to MongoDB: {e}")
     await _seed_db_if_empty()
+    await _ensure_indexes()
     _start_scheduler()
 
 @app.on_event("shutdown")
@@ -198,11 +199,57 @@ async def _seed_db_if_empty():
                 except Exception as e:
                     print(f"[seed] site_content: could not restore hero fields (DB may be read-only): {e}")
 
+# ── MongoDB indexes ────────────────────────────────────────────────────────────
+async def _ensure_indexes():
+    try:
+        from pymongo import ASCENDING, DESCENDING
+        # articles — most queried fields
+        await db["articles"].create_index([("slug", ASCENDING)], unique=True, background=True)
+        await db["articles"].create_index([("status", ASCENDING)], background=True)
+        await db["articles"].create_index([("category", ASCENDING)], background=True)
+        await db["articles"].create_index([("date_published", DESCENDING)], background=True)
+        await db["articles"].create_index([("scheduled_at", ASCENDING)], background=True, sparse=True)
+        # city_pages
+        await db["city_pages"].create_index([("slug", ASCENDING)], unique=True, background=True)
+        # services
+        await db["services"].create_index([("slug", ASCENDING)], background=True)
+        await db["services"].create_index([("order", ASCENDING)], background=True)
+        # media
+        await db["media"].create_index([("filename", ASCENDING)], background=True)
+        await db["media"].create_index([("created_at", DESCENDING)], background=True)
+        print("[db] Indexes ensured ✓")
+    except Exception as e:
+        print(f"[db] Index creation skipped (non-fatal): {e}")
+
+
 # ── APScheduler ───────────────────────────────────────────────────────────────
+async def _auto_publish_task():
+    """Publish articles whose scheduled_at has passed."""
+    try:
+        now = datetime.now(timezone.utc)
+        result = await db["articles"].update_many(
+            {
+                "status": "scheduled",
+                "scheduled_at": {"$lte": now.isoformat()},
+            },
+            {"$set": {"status": "published", "date_published": now.isoformat()}}
+        )
+        if result.modified_count:
+            print(f"[scheduler] Auto-published {result.modified_count} article(s)")
+    except Exception as e:
+        print(f"[scheduler] auto_publish error: {e}")
+
+
 def _start_scheduler():
-    # WordPress sync job removed — WordPress is being decommissioned.
-    # Manual sync still available via POST /api/sync-wordpress if needed.
-    print("[scheduler] No scheduled jobs (WordPress sync removed)")
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        scheduler = AsyncIOScheduler(timezone="Europe/Paris")
+        # Auto-publish scheduled articles every hour
+        scheduler.add_job(_auto_publish_task, "interval", hours=1, id="auto_publish")
+        scheduler.start()
+        print("[scheduler] Auto-publish job started (every 1h)")
+    except Exception as e:
+        print(f"[scheduler] Could not start: {e}")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -574,11 +621,33 @@ def _admin(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
 
 
+# ── Simple in-memory brute-force protection on login ─────────────────────────
+_login_attempts: Dict[str, list] = {}   # ip → [timestamp, ...]
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 300  # 5 minutes
+
+def _check_login_rate(ip: str):
+    import time
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW_SECONDS]
+    _login_attempts[ip] = attempts
+    if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+        wait = int(_LOGIN_WINDOW_SECONDS - (now - attempts[0]))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Trop de tentatives. Réessayez dans {wait} secondes."
+        )
+    _login_attempts[ip].append(now)
+
 @app.post("/api/admin/login")
-async def admin_login(data: dict):
+async def admin_login(data: dict, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    _check_login_rate(ip)
     password = data.get("password", "")
     if not _verify_password(password):
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    # Clear attempts on success
+    _login_attempts.pop(ip, None)
     return {"token": _create_token()}
 
 
@@ -1513,6 +1582,23 @@ Retourne UNIQUEMENT le contenu de l'article en HTML (utilise <h2>, <h3>, <p>, <u
 async def admin_regenerate_sitemap(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
     return {"success": True, "message": "Sitemap régénéré dynamiquement à chaque requête"}
+
+
+@app.post("/api/ai-generate")
+async def ai_generate_image(request: Request, authorization: Optional[str] = Header(None)):
+    """
+    Image generation endpoint — currently requires an external image AI API
+    (DALL-E, Stable Diffusion, etc.) which is not configured.
+    Returns a clear 503 so the frontend can display a helpful message.
+    """
+    _check_admin(authorization)
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "La génération d'images IA nécessite une clé API dédiée (OpenAI DALL-E ou Stable Diffusion). "
+            "Uploadez vos propres images ou utilisez des images libres de droits depuis Unsplash, Pexels, etc."
+        )
+    )
 
 
 @app.post("/api/admin/planning/fix-link-slugs")

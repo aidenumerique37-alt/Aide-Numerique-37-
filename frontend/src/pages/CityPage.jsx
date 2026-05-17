@@ -45,8 +45,8 @@ const CityPage = () => {
     return (
       <div className="pt-24 pb-20 min-h-screen bg-white dark:bg-gray-950">
         <div className="max-w-4xl mx-auto px-4 text-center py-20">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Page non trouvee</h1>
-          <Link to="/" className="text-french-blue hover:underline">Retour a l'accueil</Link>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Page non trouvée</h1>
+          <Link to="/" className="text-french-blue hover:underline">Retour à l'accueil</Link>
         </div>
       </div>
     );
@@ -254,7 +254,7 @@ const CityPage = () => {
 
             <Link to="/" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-french-blue transition-colors text-sm">
               <ArrowLeft size={16} />
-              Retour a l'accueil
+              Retour à l'accueil
             </Link>
           </div>
         </div>

@@ -43,8 +43,6 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
   useEffect(() => {
     axios.get(`${BACKEND_URL}/api/admin/generator/config`, { headers: getAuthHeaders() })
       .then(r => setConfig(r.data)).catch(() => {});
-    axios.get(`${BACKEND_URL}/api/admin/planning/budget-status`, { headers: getAuthHeaders() })
-      .then(r => setBudgetStatus(r.data)).catch(() => {});
     // Load reserve count on mount
     loadReserveArticles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -279,18 +277,6 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
         </Button>
       </div>
 
-      {budgetStatus?.is_budget_issue && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl" data-testid="budget-warning">
-          <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-red-700">Problème de budget LLM détecté ({budgetStatus.budget_errors} erreur(s) récente(s))</p>
-            <p className="text-xs text-red-600 mt-0.5">
-              Rechargez votre solde : <strong>Profil → Universal Key → Add Balance</strong>.
-              {budgetStatus.recent_errors?.[0] && <span className="block mt-1 italic opacity-80">{budgetStatus.recent_errors[0].error.slice(0, 120)}</span>}
-            </p>
-          </div>
-        </div>
-      )}
 
       {showConfig && (
         <Card className="border-purple-200">
@@ -337,8 +323,6 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
         {[
           ['create', 'Créer un article', FileText],
           ['reserve', `En réserve${reserveArticles.length > 0 ? ` (${reserveArticles.length})` : ''}`, Clock],
-          ['planning', 'Planning éditorial', List],
-          ['csv', 'Historique CSV', Upload]
         ].map(([id, label, Icon]) => (
           <button key={id} onClick={() => setGenTab(id)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${genTab === id ? 'border-french-blue text-french-blue' : 'border-transparent text-gray-500 hover:text-gray-700'}`}

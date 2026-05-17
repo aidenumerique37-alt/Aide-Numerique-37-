@@ -24,13 +24,13 @@ const BlogList = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     fetchCategories();
-    fetchArticles();
+    // fetchArticles() NOT called here — the selectedCategory effect handles initial load
   }, []);
 
   useEffect(() => {
     fetchArticles();
     setCurrentPage(1);
-  }, [selectedCategory]);
+  }, [selectedCategory]); // runs on mount (selectedCategory='') AND on every category change
 
   const fetchCategories = async () => {
     try {

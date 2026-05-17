@@ -117,13 +117,46 @@ async def _seed_db_if_empty():
             print(f"[seed] partner_categories: {len(items)} items")
 
     # Seed site content
-    if not await db["site_content"].find_one({"_id": "main"}):
+    DEFAULT_HERO = {
+        "title": "Votre Assistant",
+        "title_highlight": "Informatique",
+        "title_suffix": "à Domicile",
+        "subtitle": "Besoin d'aide avec votre ordinateur, tablette ou smartphone ? Je me déplace chez vous en Indre-et-Loire pour une assistance informatique à domicile personnalisée et bienveillante.",
+        "button_text": "Me Contacter",
+        "font_family": "Montserrat",
+        "font_size": "normal",
+        "font_size_suffix": "small",
+    }
+    DEFAULT_CONTENT = {
+        "_id": "main",
+        "hero": DEFAULT_HERO,
+        "services": {"title": "Assistance Informatique à Domicile - Mes Services", "subtitle": "Un accompagnement personnalisé pour tous vos besoins informatiques et numériques à domicile"},
+        "contact": {"title": "Contactez-Moi", "subtitle": "Une question ? Besoin d'un accompagnement informatique ? Je suis là pour vous aider."},
+        "section_order": ["reviews", "services", "howItWorks", "urssafInfo", "specialPricing", "press", "contact", "partners"],
+    }
+    existing = await db["site_content"].find_one({"_id": "main"})
+    if not existing:
         fpath = DATA_DIR / "content.json"
         if fpath.exists():
-            data = json.loads(fpath.read_text(encoding="utf-8"))
-            data["_id"] = "main"
-            await db["site_content"].insert_one(data)
-            print("[seed] site_content: 1 document")
+            try:
+                data = json.loads(fpath.read_text(encoding="utf-8"))
+                data["_id"] = "main"
+                await db["site_content"].insert_one(data)
+                print("[seed] site_content: from file")
+            except Exception:
+                await db["site_content"].insert_one(DEFAULT_CONTENT)
+                print("[seed] site_content: defaults")
+        else:
+            await db["site_content"].insert_one(DEFAULT_CONTENT)
+            print("[seed] site_content: defaults")
+    else:
+        # Restore hero fields if they were wiped (all empty strings)
+        hero = existing.get("hero", {})
+        if not hero.get("title") and not hero.get("title_highlight"):
+            restore = {f"hero.{k}": v for k, v in DEFAULT_HERO.items() if not hero.get(k)}
+            if restore:
+                await db["site_content"].update_one({"_id": "main"}, {"$set": restore})
+                print(f"[seed] site_content: restored {len(restore)} empty hero fields")
 
 # ── APScheduler ───────────────────────────────────────────────────────────────
 def _start_scheduler():
@@ -666,8 +699,11 @@ async def admin_get_content():
 
 
 @app.put("/api/admin/content")
-async def admin_put_content(data: dict, authorization: Optional[str] = Header(None)):
+async def admin_put_content(request: Request, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="JSON object expected")
     data.pop("_id", None)
     await db["site_content"].update_one({"_id": "main"}, {"$set": data}, upsert=True)
     return {"success": True}

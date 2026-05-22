@@ -68,7 +68,7 @@ const ArticlesSection = ({ ctx }) => {
               Regénérer sitemap
             </Button>
             {(() => {
-              const lowCount = articles.filter(a => computeSeoScore(a).score <= 3).length;
+              const emptyCount = articles.filter(a => !a.content || a.content.length < 50).length;
               const running = autoEnrichRun && autoEnrichRun.status === 'running';
               return (
                 <Button
@@ -77,12 +77,12 @@ const ArticlesSection = ({ ctx }) => {
                   size="sm"
                   className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white gap-1.5"
                   data-testid="auto-enrich-btn"
-                  title="Enrichit automatiquement 10 articles les plus faibles (score ≤ 3/5) en régénérant contenu + meta"
+                  title={`${emptyCount} articles sans contenu — génère contenu + meta pour 10 à la fois`}
                 >
                   {(autoEnrichLaunching || running)
                     ? <RefreshCw size={13} className="animate-spin" />
                     : <Wand2 size={13} />}
-                  Enrichir SEO auto {lowCount > 0 && `(${lowCount})`}
+                  Enrichir {emptyCount > 0 ? `(${emptyCount} sans contenu)` : '✓ tout enrichi'}
                 </Button>
               );
             })()}

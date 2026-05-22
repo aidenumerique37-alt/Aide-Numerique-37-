@@ -65,7 +65,7 @@ const LegalPage = ({ pageType, canonicalPath, metaDescription }) => {
             </h1>
 
             <div
-              className="article-content dark:text-gray-300 dark:[&_h2]:text-white dark:[&_h3]:text-gray-100 dark:[&_a]:text-french-blue dark:[&_strong]:text-white dark:[&_li]:text-gray-300"
+              className="article-content [&_p]:text-left [&_p]:hyphens-none dark:text-gray-300 dark:[&_h2]:text-white dark:[&_h3]:text-gray-100 dark:[&_a]:text-french-blue dark:[&_strong]:text-white dark:[&_li]:text-gray-300"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
 

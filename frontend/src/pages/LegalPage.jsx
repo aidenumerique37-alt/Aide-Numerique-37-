@@ -65,14 +65,7 @@ const LegalPage = ({ pageType, canonicalPath, metaDescription }) => {
             </h1>
 
             <div
-              className="prose prose-blue dark:prose-invert max-w-none
-                prose-headings:font-bold prose-headings:text-gray-900 dark:prose-headings:text-white
-                prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3
-                prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-2
-                prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-p:leading-relaxed
-                prose-li:text-gray-700 dark:prose-li:text-gray-300
-                prose-a:text-french-blue prose-a:no-underline hover:prose-a:underline
-                prose-strong:text-gray-900 dark:prose-strong:text-white"
+              className="article-content dark:text-gray-300 dark:[&_h2]:text-white dark:[&_h3]:text-gray-100 dark:[&_a]:text-french-blue dark:[&_strong]:text-white dark:[&_li]:text-gray-300"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
 

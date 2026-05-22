@@ -39,6 +39,7 @@ SMTP_USER      = os.getenv("SMTP_USER", "")
 SMTP_PASS      = os.getenv("SMTP_PASS", "")
 CONTACT_EMAIL  = os.getenv("CONTACT_EMAIL", "contact@aidenumerique37.fr")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+CLAUDE_MODEL   = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_PLACE_ID= os.getenv("GOOGLE_PLACE_ID", "")
 WP_BASE_URL    = os.getenv("WP_BASE_URL", "https://www.aidenumerique37.fr")
@@ -304,7 +305,7 @@ async def _claude(prompt: str, system: str = "", max_tokens: int = 4096) -> str:
         raise HTTPException(status_code=503, detail="Bibliothèque anthropic non installée")
     client = _anthropic_module.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     messages = [{"role": "user", "content": prompt}]
-    kwargs = {"model": "claude-opus-4-5", "max_tokens": max_tokens, "messages": messages}
+    kwargs = {"model": CLAUDE_MODEL, "max_tokens": max_tokens, "messages": messages}
     if system:
         kwargs["system"] = system
     response = await client.messages.create(**kwargs)

@@ -1355,14 +1355,15 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
 @app.post("/api/admin/articles/auto-enrich/cancel")
 async def admin_auto_enrich_cancel(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
-    result = await db["enrich_status"].update_one(
+    # Find the most recent running/queued job then cancel it
+    doc = await db["enrich_status"].find_one(
         {"status": {"$in": ["running", "queued"]}},
-        {"$set": {"status": "cancelled"}},
-        sort=[("started_at", -1)],
+        sort=[("started_at", -1)]
     )
-    if result.modified_count:
+    if doc:
+        await db["enrich_status"].update_one({"run_id": doc["run_id"]}, {"$set": {"status": "cancelled"}})
         return {"success": True, "message": "Enrichissement annulé"}
-    # No running job — reset any stuck "running" doc anyway
+    # No running job — reset any stuck "running" docs anyway
     await db["enrich_status"].update_many({"status": "running"}, {"$set": {"status": "cancelled"}})
     return {"success": True, "message": "Aucun enrichissement en cours (statut réinitialisé)"}
 

@@ -1380,7 +1380,7 @@ async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: 
             try:
                 from datetime import datetime, timezone, timedelta
                 started_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
-                if datetime.now(timezone.utc) - started_dt > timedelta(minutes=10) and doc.get("progress", 0) == 0:
+                if datetime.now(timezone.utc) - started_dt > timedelta(minutes=20) and doc.get("progress", 0) == 0:
                     await db["enrich_status"].update_one({"run_id": doc["run_id"]}, {"$set": {"status": "cancelled"}})
                     return {"status": "cancelled", "progress": 0, "total": 0, "report": [], "auto_reset": True}
             except Exception:

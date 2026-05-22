@@ -27,7 +27,7 @@ const ArticlesSection = ({ ctx }) => {
     fixingLinks, fixLinksResult, fixBrokenLinks,
     fixingPlanningLinks, fixPlanningLinksResult, fixPlanningLinks,
     sitemapRegen, sitemapResult, runSitemapRegen,
-    autoEnrichRun, autoEnrichLaunching, launchAutoEnrich,
+    autoEnrichRun, autoEnrichLaunching, launchAutoEnrich, cancelAutoEnrich,
     setPreviewArticle, loadAllData,
   } = ctx;
 
@@ -140,18 +140,31 @@ const ArticlesSection = ({ ctx }) => {
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                   autoEnrichRun.status === 'done' ? 'bg-green-100 text-green-700'
                   : autoEnrichRun.status === 'running' ? 'bg-amber-100 text-amber-700'
+                  : autoEnrichRun.status === 'cancelled' ? 'bg-red-100 text-red-600'
                   : typeof autoEnrichRun.status === 'string' && autoEnrichRun.status.startsWith('error') ? 'bg-red-100 text-red-700'
                   : 'bg-gray-100 text-gray-600'
                 }`}>
                   {autoEnrichRun.status === 'done' ? 'Terminé'
                    : autoEnrichRun.status === 'running' ? 'En cours...'
+                   : autoEnrichRun.status === 'cancelled' ? 'Annulé'
                    : autoEnrichRun.status === 'queued' ? 'En file'
                    : autoEnrichRun.status}
                 </span>
               </div>
-              <span className="text-xs font-medium text-purple-700">
-                {autoEnrichRun.processed || 0} / {autoEnrichRun.total || 0}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-purple-700">
+                  {autoEnrichRun.processed || 0} / {autoEnrichRun.total || 0}
+                </span>
+                {autoEnrichRun.status === 'running' && (
+                  <button
+                    onClick={cancelAutoEnrich}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center gap-1"
+                    title="Arrêter l'enrichissement"
+                  >
+                    <X size={10} /> Arrêter
+                  </button>
+                )}
+              </div>
             </div>
             {/* Progress bar */}
             <div className="h-1.5 bg-white rounded-full overflow-hidden mb-2">
@@ -178,9 +191,11 @@ const ArticlesSection = ({ ctx }) => {
             )}
             <p className="text-[11px] text-purple-600 mt-2 italic">
               {autoEnrichRun.status === 'running'
-                ? 'Ne fermez pas cette fenêtre — les articles sont traités en arrière-plan par Claude.'
+                ? 'Les articles sont traités en arrière-plan par Claude. Vous pouvez fermer cette fenêtre.'
                 : autoEnrichRun.status === 'done'
                 ? 'Terminé ! Vous pouvez relancer un nouveau batch pour continuer si besoin.'
+                : autoEnrichRun.status === 'cancelled'
+                ? 'Enrichissement arrêté. Vous pouvez relancer un nouveau batch.'
                 : ''}
             </p>
           </div>

@@ -1267,6 +1267,10 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
         done = 0
         report = []
         for art in to_enrich:
+            # Check cancellation flag before each article
+            current = await db["enrich_status"].find_one({"run_id": run_id})
+            if current and current.get("status") == "cancelled":
+                break
             slug = art.get("slug", "")
             title = art.get("title", slug)
             try:
@@ -1348,6 +1352,21 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
     return {"success": True, "run_id": run_id, "total": len(to_enrich)}
 
 
+@app.post("/api/admin/articles/auto-enrich/cancel")
+async def admin_auto_enrich_cancel(authorization: Optional[str] = Header(None)):
+    _check_admin(authorization)
+    result = await db["enrich_status"].update_one(
+        {"status": {"$in": ["running", "queued"]}},
+        {"$set": {"status": "cancelled"}},
+        sort=[("started_at", -1)],
+    )
+    if result.modified_count:
+        return {"success": True, "message": "Enrichissement annulé"}
+    # No running job — reset any stuck "running" doc anyway
+    await db["enrich_status"].update_many({"status": "running"}, {"$set": {"status": "cancelled"}})
+    return {"success": True, "message": "Aucun enrichissement en cours (statut réinitialisé)"}
+
+
 @app.get("/api/admin/articles/auto-enrich/status")
 async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
@@ -1355,6 +1374,16 @@ async def admin_auto_enrich_status(run_id: Optional[str] = None, authorization: 
         # Return most recent run if any
         doc = await db["enrich_status"].find_one({}, sort=[("started_at", -1)])
         if doc and doc.get("status") == "running":
+            # Auto-reset if stuck for more than 10 minutes with no progress
+            started = doc.get("started_at", "")
+            try:
+                from datetime import datetime, timezone, timedelta
+                started_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) - started_dt > timedelta(minutes=10) and doc.get("progress", 0) == 0:
+                    await db["enrich_status"].update_one({"run_id": doc["run_id"]}, {"$set": {"status": "cancelled"}})
+                    return {"status": "cancelled", "progress": 0, "total": 0, "report": [], "auto_reset": True}
+            except Exception:
+                pass
             return {"found": True, "run_id": doc.get("run_id"), "status": "running",
                     "progress": doc.get("progress", 0), "processed": doc.get("processed", 0),
                     "total": doc.get("total", 0), "report": doc.get("report", [])}

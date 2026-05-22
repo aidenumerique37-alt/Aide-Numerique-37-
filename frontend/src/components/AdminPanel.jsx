@@ -160,6 +160,16 @@ const AdminPanel = () => {
     }, 5000);
   };
 
+  const cancelAutoEnrich = async () => {
+    try {
+      await axios.post(`${BACKEND_URL}/api/admin/articles/auto-enrich/cancel`, {}, { headers: getAuthHeaders() });
+      if (autoEnrichPollRef.current) { clearInterval(autoEnrichPollRef.current); autoEnrichPollRef.current = null; }
+      setAutoEnrichRun(prev => prev ? { ...prev, status: 'cancelled' } : null);
+    } catch (e) {
+      alert('Erreur annulation : ' + (e.response?.data?.detail || e.message));
+    }
+  };
+
   const launchAutoEnrich = async (opts = {}) => {
     const threshold = opts.threshold ?? 3;
     const max_articles = opts.max_articles ?? 10;
@@ -1462,7 +1472,7 @@ const AdminPanel = () => {
                 fixingLinks, fixLinksResult, fixBrokenLinks,
                 fixingPlanningLinks, fixPlanningLinksResult, fixPlanningLinks,
                 sitemapRegen, sitemapResult, runSitemapRegen,
-                autoEnrichRun, autoEnrichLaunching, launchAutoEnrich,
+                autoEnrichRun, autoEnrichLaunching, launchAutoEnrich, cancelAutoEnrich,
                 setPreviewArticle, loadAllData,
               }} />
             )}

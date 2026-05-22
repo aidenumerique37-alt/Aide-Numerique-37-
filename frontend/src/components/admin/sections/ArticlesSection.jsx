@@ -28,6 +28,7 @@ const ArticlesSection = ({ ctx }) => {
     fixingPlanningLinks, fixPlanningLinksResult, fixPlanningLinks,
     sitemapRegen, sitemapResult, runSitemapRegen,
     autoEnrichRun, autoEnrichLaunching, launchAutoEnrich, cancelAutoEnrich,
+    articleSort, setArticleSort,
     setPreviewArticle, loadAllData,
   } = ctx;
 
@@ -202,17 +203,40 @@ const ArticlesSection = ({ ctx }) => {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-            {[['all','Tous'], ['ai','IA générés']].map(([val,label]) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filter tabs */}
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
+            {[
+              ['all',        'Tous'],
+              ['no-content', '⚠ Sans contenu'],
+              ['low-seo',    '📉 SEO faible'],
+              ['ai',         '✦ IA générés'],
+            ].map(([val, label]) => (
               <button key={val} onClick={() => setArticleFilter(val)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${articleFilter === val ? 'bg-white shadow text-french-blue' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  articleFilter === val ? 'bg-white shadow text-french-blue' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >{label}</button>
             ))}
           </div>
+
+          {/* Sort */}
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
+            {[
+              ['date',    '📅 Date'],
+              ['seo-asc', '📊 SEO ↑'],
+            ].map(([val, label]) => (
+              <button key={val} onClick={() => setArticleSort(val)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  articleSort === val ? 'bg-white shadow text-french-blue' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >{label}</button>
+            ))}
+          </div>
+
           <input value={articleSearch} onChange={e => setArticleSearch(e.target.value)}
-            placeholder="Rechercher..." className="border rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs" data-testid="article-search-input" />
-          <span className="text-xs text-gray-400">{filteredArticles.length} résultat(s)</span>
+            placeholder="Rechercher..." className="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[140px] max-w-xs" data-testid="article-search-input" />
+          <span className="text-xs text-gray-400 flex-shrink-0">{filteredArticles.length} résultat(s)</span>
         </div>
 
         {/* Article list */}

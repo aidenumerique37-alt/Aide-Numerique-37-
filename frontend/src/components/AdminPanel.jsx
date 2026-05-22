@@ -14,7 +14,7 @@ import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import axios from 'axios';
 import SeoDashboard from './admin/SeoDashboard';
-import { SeoBadge } from './admin/SeoBadge';
+import { SeoBadge, computeSeoScore } from './admin/SeoBadge';
 import RichEditor from './admin/RichEditor';
 import ArticlePreview from './admin/ArticlePreview';
 import ImageInputField from './admin/ImageInputField';
@@ -70,7 +70,8 @@ const AdminPanel = () => {
   const [cityPageGenerating, setCityPageGenerating] = useState(false);
   const [citiesSubTab, setCitiesSubTab] = useState('zone'); // 'zone' | 'pages'
   const [articles, setArticles] = useState([]);
-  const [articleFilter, setArticleFilter] = useState('all'); // 'all' | 'ai'
+  const [articleFilter, setArticleFilter] = useState('all'); // 'all' | 'ai' | 'no-content' | 'low-seo'
+  const [articleSort, setArticleSort] = useState('date'); // 'date' | 'seo-asc'
   const [articleSearch, setArticleSearch] = useState('');
   const [editingArticle, setEditingArticle] = useState(null);
   const [backfillResult, setBackfillResult] = useState(null);
@@ -97,13 +98,22 @@ const AdminPanel = () => {
   const [portfolioProjects, setPortfolioProjects] = useState([]);
   const [editingProject, setEditingProject] = useState(null);
 
-  // Memoized filtered article list — avoids re-filtering 160+ articles on every render
-  const filteredArticles = useMemo(() =>
-    articles
-      .filter(a => articleFilter === 'ai' ? a.source === 'ai_generated' : true)
-      .filter(a => !articleSearch || a.title?.toLowerCase().includes(articleSearch.toLowerCase())),
-    [articles, articleFilter, articleSearch]
-  );
+  // Memoized filtered + sorted article list
+  const filteredArticles = useMemo(() => {
+    let list = articles
+      .filter(a => {
+        if (articleFilter === 'ai')         return a.source === 'ai_generated';
+        if (articleFilter === 'no-content') return !a.content || a.content.length < 50;
+        if (articleFilter === 'low-seo')    return computeSeoScore(a).score <= 2;
+        return true;
+      })
+      .filter(a => !articleSearch || a.title?.toLowerCase().includes(articleSearch.toLowerCase()));
+
+    if (articleSort === 'seo-asc') {
+      list = [...list].sort((a, b) => computeSeoScore(a).score - computeSeoScore(b).score);
+    }
+    return list;
+  }, [articles, articleFilter, articleSort, articleSearch]);
 
   // Memoized city lists
   const primaryCitiesList = useMemo(() => cities.filter(c => c.is_primary), [cities]);
@@ -1461,7 +1471,7 @@ const AdminPanel = () => {
             {!loading && activeSection === 'articles' && (
               <ArticlesSection ctx={{
                 articles, filteredArticles,
-                articleFilter, setArticleFilter, articleSearch, setArticleSearch,
+                articleFilter, setArticleFilter, articleSort, setArticleSort, articleSearch, setArticleSearch,
                 editingArticle, setEditingArticle,
                 articleSaving, saveArticle, deleteArticle,
                 regenerateArticle, regeneratingArticle,

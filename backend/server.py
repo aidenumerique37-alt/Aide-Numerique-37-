@@ -38,6 +38,7 @@ SMTP_PORT      = int(os.getenv("SMTP_PORT", "465"))
 SMTP_USER      = os.getenv("SMTP_USER", "")
 SMTP_PASS      = os.getenv("SMTP_PASS", "")
 CONTACT_EMAIL  = os.getenv("CONTACT_EMAIL", "contact@aidenumerique37.fr")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_PLACE_ID= os.getenv("GOOGLE_PLACE_ID", "")
 WP_BASE_URL    = os.getenv("WP_BASE_URL", "https://www.aidenumerique37.fr")
@@ -495,19 +496,14 @@ def _esc(text: str) -> str:
 
 @app.post("/api/contact/send")
 async def send_contact(form: ContactForm):
-    if not SMTP_USER or not SMTP_PASS:
-        raise HTTPException(status_code=503, detail="SMTP not configured")
+    if not RESEND_API_KEY and (not SMTP_USER or not SMTP_PASS):
+        raise HTTPException(status_code=503, detail="Email not configured")
 
-    msg = MIMEMultipart("alternative")
-    msg["From"]    = SMTP_USER
-    msg["To"]      = CONTACT_EMAIL
-    msg["Reply-To"]= form.email
-
-    options_str = ", ".join(form.service_options) if form.service_options else "—"
+    options_str  = ", ".join(form.service_options) if form.service_options else "—"
     subject_line = form.service or form.subject or "Nouveau message"
-    msg["Subject"] = f"[Aide Numérique 37] {subject_line}"
+    subject      = f"[Aide Numérique 37] {subject_line}"
 
-    body = (
+    body_plain = (
         f"Nouveau message depuis le site web\n\n"
         f"Nom : {form.name}\nEmail : {form.email}\n"
         f"Téléphone : {form.phone or 'Non renseigné'}\n"
@@ -515,7 +511,7 @@ async def send_contact(form: ContactForm):
         f"Sujet : {form.subject or 'Non renseigné'}\n\nMessage :\n{form.message}"
     )
     # All user-supplied values are HTML-escaped before being inserted in the email body
-    html = (
+    body_html = (
         f'<html><body style="font-family:Arial,sans-serif;color:#333">'
         f'<h2 style="color:#1a56db">Nouveau message — Aide Numérique 37</h2>'
         f'<table style="border-collapse:collapse;width:100%">'
@@ -530,13 +526,47 @@ async def send_contact(form: ContactForm):
         f'</body></html>'
     )
 
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    # ── Path 1 : Resend HTTP API (works on Railway — no outbound SMTP needed) ──
+    if RESEND_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": f"Aide Numérique 37 <onboarding@resend.dev>",
+                        "to": [CONTACT_EMAIL],
+                        "reply_to": form.email,
+                        "subject": subject,
+                        "html": body_html,
+                        "text": body_plain,
+                    },
+                )
+            if resp.status_code in (200, 201):
+                return {"success": True, "message": "Message envoyé avec succès"}
+            # Surface Resend error clearly
+            err_detail = resp.json().get("message", resp.text) if resp.headers.get("content-type","").startswith("application/json") else resp.text
+            raise HTTPException(status_code=500, detail=f"Resend error {resp.status_code}: {err_detail}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erreur Resend : {str(e)}")
 
-    # Try port 587 STARTTLS first (Railway-compatible), then 465 SSL
+    # ── Path 2 : Direct SMTP fallback (for local dev / non-Railway hosting) ──
+    msg = MIMEMultipart("alternative")
+    msg["From"]     = SMTP_USER
+    msg["To"]       = CONTACT_EMAIL
+    msg["Reply-To"] = form.email
+    msg["Subject"]  = subject
+    msg.attach(MIMEText(body_plain, "plain", "utf-8"))
+    msg.attach(MIMEText(body_html,  "html",  "utf-8"))
+
     sent = False
     last_err = None
-    for port, use_tls, start_tls in [(587, False, True), (465, True, False), (SMTP_PORT, SMTP_PORT != 587, SMTP_PORT == 587)]:
+    for port, use_tls, start_tls in [(587, False, True), (465, True, False)]:
         try:
             await aiosmtplib.send(
                 msg, hostname=SMTP_HOST, port=port,

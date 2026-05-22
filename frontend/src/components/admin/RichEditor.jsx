@@ -29,7 +29,7 @@ const RichEditor = ({ value, onChange, articleKey }) => {
       .split(/\s+/)
       .filter(Boolean).length;
     setWordCount(wc);
-  }, [articleKey]);
+  }, [value, articleKey]);
 
   const handleChange = (html) => {
     const wc = html

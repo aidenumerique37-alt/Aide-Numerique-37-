@@ -217,7 +217,7 @@ const ArticlesSection = ({ ctx }) => {
                   {article.category && <span className="text-xs bg-french-blue/10 text-french-blue px-1.5 py-0.5 rounded-full">{article.category}</span>}
                   {article.source === 'ai_generated' && <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Sparkles size={9} />IA</span>}
                   {article.status === 'scheduled' && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Planifié</span>}
-                  {(!article.content_html || article.content_html.length < 100) && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Sans contenu</span>}
+                  {(!article.content || article.content.length < 100) && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Sans contenu</span>}
                   <SeoBadge article={article} />
                 </div>
               </div>
@@ -348,9 +348,9 @@ const ArticlesSection = ({ ctx }) => {
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center gap-2">
               Contenu de l'article
-              {(!editingArticle.content_html || editingArticle.content_html.length < 100) && <span className="text-red-500 text-xs font-normal">— vide !</span>}
+              {(!editingArticle.content || editingArticle.content.length < 100) && <span className="text-red-500 text-xs font-normal">— vide !</span>}
             </label>
-            <RichEditor articleKey={editingArticle._originalSlug} value={editingArticle.content_html || ''} onChange={(html) => setEditingArticle(p => ({ ...p, content_html: html }))} />
+            <RichEditor articleKey={editingArticle._originalSlug} value={editingArticle.content || ''} onChange={(html) => setEditingArticle(p => ({ ...p, content: html }))} />
           </div>
         </CardContent>
       </Card>

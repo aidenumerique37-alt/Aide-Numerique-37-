@@ -75,6 +75,7 @@ app = FastAPI(title="Aide Numérique 37 API", version="1.0.0")
 _ALLOWED_ORIGINS = [
     "https://www.aidenumerique37.fr",
     "https://aidenumerique37.fr",
+    "https://seashell-duck-353987.hostingersite.com",  # Hostinger staging
     "http://localhost:3000",   # dev
     "http://localhost:3001",   # dev alt
 ]

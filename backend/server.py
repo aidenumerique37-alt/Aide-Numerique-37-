@@ -1275,16 +1275,30 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
                 # ── Step 1: generate full content if missing ──────────────────
                 if not existing_content:
                     content_prompt = (
-                        f'Rédige un article de blog complet et optimisé SEO intitulé : "{title}"\n\n'
+                        f'Rédige un article de blog HTML pour le titre : "{title}"\n\n'
+                        f"RÈGLES ABSOLUES :\n"
+                        f"- Ta réponse doit commencer DIRECTEMENT par une balise HTML (ex: <h2> ou <p>)\n"
+                        f"- N'inclus AUCUN JSON, AUCUN markdown, AUCUN bloc de code, AUCUN commentaire\n"
+                        f"- Utilise UNIQUEMENT ces balises : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>\n\n"
                         f"L'article doit :\n"
                         f"- Avoir une introduction engageante (2-3 paragraphes)\n"
                         f"- Être structuré avec des sous-titres H2 et H3\n"
                         f"- Contenir entre 600 et 900 mots\n"
                         f"- Inclure des conseils pratiques et concrets\n"
                         f"- Se terminer par une conclusion avec appel à l'action doux\n\n"
-                        f"Retourne UNIQUEMENT le HTML (<h2>,<h3>,<p>,<ul>,<li>,<strong>). Pas de balise html/body."
+                        f"Commence directement par le premier <h2> sans rien d'autre avant."
                     )
                     new_content = await _claude(content_prompt, system=system, max_tokens=2000)
+
+                    # Strip markdown code fences if Claude wrapped the response
+                    new_content = _re.sub(r'^```[a-z]*\s*', '', new_content.strip())
+                    new_content = _re.sub(r'\s*```$', '', new_content.strip())
+                    new_content = new_content.strip()
+
+                    # Reject if response doesn't contain any HTML tag (likely JSON or plain text)
+                    if not _re.search(r'<(h[1-6]|p|ul|ol|li|strong|em)\b', new_content):
+                        raise ValueError(f"Claude n'a pas retourné de HTML valide (reçu : {new_content[:120]})")
+
                     plain = _re.sub(r"<[^>]+>", "", new_content)
                     excerpt = (plain.strip()[:160].rsplit(" ", 1)[0] + "…") if len(plain) > 160 else plain.strip()
                     await db["articles"].update_one(

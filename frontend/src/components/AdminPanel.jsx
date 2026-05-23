@@ -94,6 +94,11 @@ const AdminPanel = () => {
   const [autoEnrichLaunching, setAutoEnrichLaunching] = useState(false);
   const autoEnrichPollRef = useRef(null);
 
+  // CSV import
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const csvInputRef = useRef(null);
+
   // Portfolio state
   const [portfolioProjects, setPortfolioProjects] = useState([]);
   const [editingProject, setEditingProject] = useState(null);
@@ -105,12 +110,20 @@ const AdminPanel = () => {
         if (articleFilter === 'ai')         return a.source === 'ai_generated';
         if (articleFilter === 'no-content') return !a.content || a.content.length < 50;
         if (articleFilter === 'low-seo')    return computeSeoScore(a).score <= 2;
+        if (articleFilter === 'scheduled')  return a.status === 'scheduled';
         return true;
       })
       .filter(a => !articleSearch || a.title?.toLowerCase().includes(articleSearch.toLowerCase()));
 
     if (articleSort === 'seo-asc') {
       list = [...list].sort((a, b) => computeSeoScore(a).score - computeSeoScore(b).score);
+    }
+    if (articleSort === 'date-asc') {
+      list = [...list].sort((a, b) => {
+        const da = new Date(a.date_published || a.scheduled_at || '9999');
+        const db_ = new Date(b.date_published || b.scheduled_at || '9999');
+        return da - db_;
+      });
     }
     return list;
   }, [articles, articleFilter, articleSort, articleSearch]);
@@ -178,6 +191,36 @@ const AdminPanel = () => {
     } catch (e) {
       alert('Erreur annulation : ' + (e.response?.data?.detail || e.message));
     }
+  };
+
+  // Import planning CSV → POST /api/admin/articles/import-csv
+  const importCsv = async (file) => {
+    if (!file) return;
+    setImportingCsv(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post(
+        `${BACKEND_URL}/api/admin/articles/import-csv`,
+        formData,
+        { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' } }
+      );
+      const d = res.data;
+      setImportResult({
+        success: true,
+        message: `✓ ${d.inserted} articles importés, ${d.skipped} ignorés (doublons)` +
+          (d.errors?.length ? `, ${d.errors.length} erreur(s)` : ''),
+        errors: d.errors || [],
+      });
+      // Refresh article list
+      axios.get(`${BACKEND_URL}/api/admin/articles`, { headers: getAuthHeaders() })
+        .then(r => setArticles(r.data)).catch(() => {});
+    } catch (e) {
+      setImportResult({ success: false, message: e.response?.data?.detail || e.message, errors: [] });
+    }
+    setImportingCsv(false);
+    setTimeout(() => setImportResult(null), 10000);
   };
 
   const launchAutoEnrich = async (opts = {}) => {
@@ -1483,6 +1526,7 @@ const AdminPanel = () => {
                 fixingPlanningLinks, fixPlanningLinksResult, fixPlanningLinks,
                 sitemapRegen, sitemapResult, runSitemapRegen,
                 autoEnrichRun, autoEnrichLaunching, launchAutoEnrich, cancelAutoEnrich,
+                importingCsv, importResult, importCsv, csvInputRef,
                 setPreviewArticle, loadAllData,
               }} />
             )}

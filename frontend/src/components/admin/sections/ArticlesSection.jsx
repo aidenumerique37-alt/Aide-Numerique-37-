@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   FileText, Edit2, Trash2, X, Save, RefreshCw, Sparkles,
-  ExternalLink, CheckCircle, AlertCircle, BarChart2, Globe, Link as LinkIcon, Eye, Wand2
+  ExternalLink, CheckCircle, AlertCircle, BarChart2, Globe, Link as LinkIcon, Eye, Wand2, Upload, CalendarClock
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -28,9 +28,13 @@ const ArticlesSection = ({ ctx }) => {
     fixingPlanningLinks, fixPlanningLinksResult, fixPlanningLinks,
     sitemapRegen, sitemapResult, runSitemapRegen,
     autoEnrichRun, autoEnrichLaunching, launchAutoEnrich, cancelAutoEnrich,
+    importingCsv, importResult, importCsv, csvInputRef,
     articleSort, setArticleSort,
     setPreviewArticle, loadAllData,
   } = ctx;
+
+  const scheduledCount = articles.filter(a => a.status === 'scheduled').length;
+  const readyCount = articles.filter(a => a.status === 'scheduled' && a.content && a.content.length >= 50).length;
 
   // ─── ARTICLE LIST VIEW ───
   if (!editingArticle) {
@@ -67,6 +71,24 @@ const ArticlesSection = ({ ctx }) => {
               className="border-blue-200 text-blue-700 hover:bg-blue-50 gap-1.5" data-testid="regen-sitemap-btn">
               {sitemapRegen ? <RefreshCw size={13} className="animate-spin" /> : <Globe size={13} />}
               Regénérer sitemap
+            </Button>
+            {/* CSV import — hidden file input + trigger button */}
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={e => { if (e.target.files?.[0]) importCsv(e.target.files[0]); e.target.value = ''; }}
+            />
+            <Button
+              onClick={() => csvInputRef?.current?.click()}
+              disabled={importingCsv}
+              variant="outline" size="sm"
+              className="border-teal-200 text-teal-700 hover:bg-teal-50 gap-1.5"
+              title="Importer le planning SEO CSV (séparateur ;)"
+            >
+              {importingCsv ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
+              Importer CSV
             </Button>
             {(() => {
               const emptyCount = articles.filter(a => !a.content || a.content.length < 50).length;
@@ -126,6 +148,33 @@ const ArticlesSection = ({ ctx }) => {
               <p className="font-medium">{fixPlanningLinksResult.message}</p>
               {fixPlanningLinksResult.data && <p className="text-xs mt-1 opacity-75">{fixPlanningLinksResult.data.total_items_processed} entrées de planning traitées</p>}
             </div>
+          </div>
+        )}
+        {importResult && (
+          <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${importResult.success ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            {importResult.success ? <CheckCircle size={15} className="mt-0.5 shrink-0" /> : <AlertCircle size={15} className="mt-0.5 shrink-0" />}
+            <div>
+              <p className="font-medium">{importResult.message}</p>
+              {importResult.errors?.length > 0 && (
+                <ul className="text-xs mt-1 opacity-75 list-disc list-inside">
+                  {importResult.errors.slice(0, 5).map((e, i) => <li key={i}>Ligne {e.row}: {e.error}</li>)}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Scheduled pipeline info bar */}
+        {scheduledCount > 0 && (
+          <div className="rounded-lg p-2.5 text-xs flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700">
+            <CalendarClock size={14} className="shrink-0" />
+            <span>
+              <strong>{scheduledCount}</strong> articles planifiés ·{' '}
+              <strong className={readyCount >= 5 ? 'text-green-700' : 'text-amber-800'}>
+                {readyCount} prêts
+              </strong>
+              {readyCount < 5 && <span className="text-amber-600"> (objectif : 5 prêts en avance — lancez l'enrichissement)</span>}
+              {readyCount >= 5 && <span className="text-green-700"> ✓ pipeline OK</span>}
+            </span>
           </div>
         )}
 
@@ -210,7 +259,8 @@ const ArticlesSection = ({ ctx }) => {
               ['all',        'Tous'],
               ['no-content', '⚠ Sans contenu'],
               ['low-seo',    '📉 SEO faible'],
-              ['ai',         '✦ IA générés'],
+              ['scheduled',  '📅 Planifiés'],
+              ['ai',         '✦ IA'],
             ].map(([val, label]) => (
               <button key={val} onClick={() => setArticleFilter(val)}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
@@ -223,8 +273,9 @@ const ArticlesSection = ({ ctx }) => {
           {/* Sort */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
             {[
-              ['date',    '📅 Date'],
-              ['seo-asc', '📊 SEO ↑'],
+              ['date',     '📅 Date ↓'],
+              ['date-asc', '📅 Date ↑'],
+              ['seo-asc',  '📊 SEO ↑'],
             ].map(([val, label]) => (
               <button key={val} onClick={() => setArticleSort(val)}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
@@ -255,7 +306,12 @@ const ArticlesSection = ({ ctx }) => {
                   <span className="text-xs text-gray-400">{new Date(article.date_published || article.date).toLocaleDateString('fr-FR')}</span>
                   {article.category && <span className="text-xs bg-french-blue/10 text-french-blue px-1.5 py-0.5 rounded-full">{article.category}</span>}
                   {article.source === 'ai_generated' && <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Sparkles size={9} />IA</span>}
-                  {article.status === 'scheduled' && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Planifié</span>}
+                  {article.status === 'scheduled' && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <CalendarClock size={9} />
+                      {article.content && article.content.length >= 50 ? '✓ Prêt' : 'À rédiger'}
+                    </span>
+                  )}
                   {(!article.content || article.content.length < 100) && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Sans contenu</span>}
                   <SeoBadge article={article} />
                 </div>

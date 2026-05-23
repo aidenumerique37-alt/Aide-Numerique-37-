@@ -1123,6 +1123,114 @@ async def admin_delete_article(slug: str, authorization: Optional[str] = Header(
     return {"success": True}
 
 
+@app.post("/api/admin/articles/import-csv")
+async def admin_import_csv(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    """
+    Import SEO planning from a semicolon-delimited CSV file.
+    Creates articles with status='scheduled' and sets scheduled_at from the Date_publication column.
+    Skips articles whose slug already exists (duplicate detection).
+    """
+    _check_admin(authorization)
+    import csv as _csv, io as _io, unicodedata as _ud
+
+    raw = await file.read()
+    text = raw.decode("utf-8-sig")  # strip BOM if present
+    reader = _csv.reader(_io.StringIO(text), delimiter=";", quotechar='"')
+    rows = list(reader)
+    if len(rows) < 2:
+        raise HTTPException(status_code=400, detail="Fichier CSV vide ou sans données")
+
+    headers = [h.strip() for h in rows[0]]
+
+    def _col(row, name):
+        try:
+            return row[headers.index(name)].strip()
+        except (ValueError, IndexError):
+            return ""
+
+    def _parse_date(d: str) -> str:
+        """Convert DD/MM/YYYY → ISO 8601 date string (noon UTC)."""
+        try:
+            day, month, year = d.strip().split("/")
+            return f"{year}-{month.zfill(2)}-{day.zfill(2)}T12:00:00+00:00"
+        except Exception:
+            return _now()
+
+    inserted, skipped, errors = [], [], []
+
+    for i, row in enumerate(rows[1:], start=2):
+        if not any(row):
+            continue
+        try:
+            slug = _col(row, "URL_slug")
+            title = _col(row, "Titre_H1")
+            if not slug or not title:
+                errors.append({"row": i, "error": "slug ou titre manquant"})
+                continue
+
+            # Duplicate check
+            existing = await db["articles"].find_one({"slug": slug}, {"slug": 1})
+            if existing:
+                skipped.append(slug)
+                continue
+
+            pub_date_str = _col(row, "Date_publication")
+            scheduled_iso = _parse_date(pub_date_str)
+
+            # Build article document
+            h2s = [_col(row, f"H2_{n}") for n in range(1, 5)]
+            outline = [h for h in h2s if h]
+
+            faqs = []
+            for n in range(1, 4):
+                q = _col(row, f"FAQ_question_{n}")
+                a = _col(row, f"FAQ_reponse_{n}_resume")
+                if q and a:
+                    faqs.append({"question": q, "answer": a})
+
+            doc = {
+                "slug": slug,
+                "title": title,
+                "meta_title": _col(row, "Meta_titre_60car"),
+                "meta_description": _col(row, "Meta_description_155car"),
+                "status": "scheduled",
+                "date_published": scheduled_iso,
+                "scheduled_at": scheduled_iso,
+                "date_modified": _now(),
+                "category": _col(row, "Categorie_blog"),
+                "source": "seo_planning",
+                "content": "",
+                "content_html": "",
+                # ── SEO planning metadata ──────────────────────────────
+                "seo_keyword": _col(row, "Mot_cle_principal"),
+                "seo_priority": _col(row, "Priorite_SEO"),
+                "target_city": _col(row, "Ville_cible_principale"),
+                "target_audience": _col(row, "Public_cible"),
+                "content_type": _col(row, "Type_contenu"),
+                "outline": outline,
+                "hook": _col(row, "Hook_introduction_2phrases"),
+                "editorial_notes": _col(row, "Notes_editoriales"),
+                "faqs": faqs,
+                "pillar": _col(row, "Pilier_ou_cluster"),
+                "week": _col(row, "Semaine"),
+            }
+
+            await db["articles"].insert_one(doc)
+            inserted.append(slug)
+
+        except Exception as e:
+            errors.append({"row": i, "slug": _col(row, "URL_slug"), "error": str(e)})
+
+    return {
+        "success": True,
+        "inserted": len(inserted),
+        "skipped": len(skipped),
+        "errors": errors,
+        "inserted_slugs": inserted[:20],   # preview (first 20)
+        "skipped_slugs": skipped[:20],
+    }
+
+
 @app.get("/api/admin/articles/sync-status")
 async def admin_sync_status(authorization: Optional[str] = Header(None)):
     _check_admin(authorization)
@@ -1250,8 +1358,15 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
     system = master_prompt if master_prompt else DEFAULT_SYSTEM
 
     # Select articles missing content (priority) or missing meta
+    # Sort "no_content" articles so the next scheduled articles (by date) come first
+    # → ensures the 5 nearest publications are always ready
     all_articles = await db["articles"].find({}).to_list(length=500)
-    no_content  = [a for a in all_articles if not a.get("content", "").strip()]
+    no_content = sorted(
+        [a for a in all_articles if not a.get("content", "").strip()],
+        key=lambda x: (
+            x.get("scheduled_at") or x.get("date_published") or "9999"
+        )
+    )
     has_content = [a for a in all_articles if a.get("content", "").strip()
                    and (not a.get("meta_title") or not a.get("meta_description"))]
     to_enrich = (no_content + has_content)[:max_articles]
@@ -1279,12 +1394,34 @@ async def admin_auto_enrich(request: Request, authorization: Optional[str] = Hea
 
                 # ── Step 1: generate full content if missing ──────────────────
                 if not existing_content:
+                    # Use planning metadata if available (imported from CSV)
+                    hook_hint = art.get("hook", "")
+                    outline_hint = art.get("outline", [])
+                    city_hint = art.get("target_city", "")
+                    kw_hint = art.get("seo_keyword", "")
+
+                    structure_block = ""
+                    if outline_hint:
+                        structure_block = "Structure imposée (utilise ces H2 dans l'ordre) :\n"
+                        structure_block += "\n".join(f"- {h}" for h in outline_hint) + "\n\n"
+
+                    hook_block = ""
+                    if hook_hint:
+                        hook_block = f"Introduction suggérée (à développer) :\n{hook_hint}\n\n"
+
+                    city_block = f"Ville cible : {city_hint}. Mentionne cette ville naturellement dans le contenu.\n\n" if city_hint else ""
+                    kw_block   = f"Mot-clé SEO principal à inclure : {kw_hint}\n\n" if kw_hint else ""
+
                     content_prompt = (
                         f'Rédige un article de blog HTML pour le titre : "{title}"\n\n'
                         f"RÈGLES ABSOLUES :\n"
                         f"- Ta réponse doit commencer DIRECTEMENT par une balise HTML (ex: <h2> ou <p>)\n"
                         f"- N'inclus AUCUN JSON, AUCUN markdown, AUCUN bloc de code, AUCUN commentaire\n"
                         f"- Utilise UNIQUEMENT ces balises : <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>\n\n"
+                        f"{structure_block}"
+                        f"{hook_block}"
+                        f"{city_block}"
+                        f"{kw_block}"
                         f"L'article doit :\n"
                         f"- Avoir une introduction engageante (2-3 paragraphes)\n"
                         f"- Être structuré avec des sous-titres H2 et H3\n"

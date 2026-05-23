@@ -493,6 +493,132 @@ code {
     color: #4b5563;
 }
 
+/* ========================================
+   MACBOOK SPLASH SCREEN — 3D CLASSES
+   ======================================== */
+
+/* --- Static structural classes --- */
+.macbook-container    { perspective: 800px; }
+.macbook-inner        { transform-style: preserve-3d; }
+.macbook-screen       { transform-style: preserve-3d; transform-origin: center bottom; }
+.macbook-screen-face-one { transform: translateZ(2px); }
+.macbook-body         { transform-style: preserve-3d; transform-origin: center top; transform: rotateX(-90deg); }
+.macbook-body-face-one{ transform-style: preserve-3d; transform: translateZ(-2px); }
+.macbook-keyboard     { transform-style: preserve-3d; }
+.macbook-key          { transform: translateZ(-2px); }
+.macbook-shadow       { transform: rotateX(90deg) translateZ(-28px); }
+
+/* --- Keyframes --- */
+
+/* Overall rocking rotation after lid opens */
+@keyframes macbook-rotate {
+  0%, 100% { transform: rotateX(-20deg) rotateY(-12deg) rotateZ(0deg); }
+  50%       { transform: rotateX(-20deg) rotateY(12deg)  rotateZ(0deg); }
+}
+
+/* Lid opens with spring overshoot */
+@keyframes macbook-lid-screen {
+  0%   { transform: rotateX(90deg); }
+  55%  { transform: rotateX(-7deg); }
+  75%  { transform: rotateX(4deg);  }
+  90%  { transform: rotateX(-2deg); }
+  100% { transform: rotateX(0deg);  }
+}
+
+/* Base flips open in sync with lid */
+@keyframes macbook-lid-body {
+  0%   { transform: rotateX(-90deg); }
+  55%  { transform: rotateX(7deg);   }
+  75%  { transform: rotateX(-4deg);  }
+  90%  { transform: rotateX(2deg);   }
+  100% { transform: rotateX(0deg);   }
+}
+
+/* Keyboard area brightens as MacBook opens */
+@keyframes macbook-keyboard-color {
+  0%   { background-color: #bbbbbb; }
+  100% { background-color: #dfdfdf; }
+}
+
+/* Key micro-press — stagger via animation-delay on each key */
+@keyframes macbook-key-press {
+  0%, 85%, 100% { transform: translateZ(-2px); }
+  92%           { transform: translateZ(-5px); box-shadow: 0 -1px 0 #111; }
+}
+
+/* Screen glare sweeps left → right */
+@keyframes macbook-screen-glare {
+  0%   { background-position: -200px 0; }
+  60%  { background-position: 200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+/* Shadow grows as MacBook settles */
+@keyframes macbook-shadow-appear {
+  0%   { opacity: 0; box-shadow: 0 0 10px 5px rgba(0,0,0,0.1); }
+  100% { opacity: 1; box-shadow: 0 0 60px 40px rgba(0,0,0,0.3); }
+}
+
+/* --- Animation classes --- */
+
+/* Starts immediately; 0-900ms open, then 1s+ rocking */
+.custom-animate-rotate {
+  animation:
+    macbook-lid-screen 0s linear 0s 1 forwards,  /* reset trick */
+    macbook-rotate 3.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) 1.2s infinite;
+  /* initial state before rocking */
+  transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg);
+}
+
+.custom-animate-lid-screen {
+  animation: macbook-lid-screen 900ms cubic-bezier(0.34, 1.46, 0.64, 1) 0ms 1 forwards;
+}
+
+.custom-animate-lid-macbody {
+  animation: macbook-lid-body 900ms cubic-bezier(0.34, 1.46, 0.64, 1) 0ms 1 forwards;
+}
+
+.custom-animate-lid-keyboard-area {
+  animation: macbook-keyboard-color 700ms ease-out 0ms 1 forwards;
+}
+
+.custom-animate-keys {
+  animation: macbook-key-press 1.4s ease-in-out 1.5s infinite;
+}
+
+.custom-animate-screen-shade {
+  animation: macbook-screen-glare 2.5s ease-in-out 1.5s infinite;
+}
+
+.custom-animate-macbook-shadow {
+  animation: macbook-shadow-appear 800ms ease-out 200ms 1 forwards;
+  opacity: 0;
+}
+
+/* --- Splash screen overlay --- */
+@keyframes splash-fade-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+
+@keyframes splash-brand-in {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes splash-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+  40%           { transform: scale(1.2); opacity: 1; }
+}
+
+.splash-fade-out {
+  animation: splash-fade-out 500ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.splash-brand-in {
+  animation: splash-brand-in 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .article-content {

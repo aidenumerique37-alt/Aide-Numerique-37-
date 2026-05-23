@@ -1,108 +1,85 @@
 import React from 'react';
 
-/**
- * MacBook Air 3D CSS animation component.
- * Requires the `.macbook-*` and `.custom-animate-*` classes from index.css.
- */
 const Macbook = () => {
+  // Base classes for keys
+  // macbook-key  → transform: translateZ(-2px)  (from index.css)
+  // custom-animate-keys → animation              (from index.css)
   const keyBaseClasses =
     'w-[6px] h-[6px] bg-[#444] float-left m-[1px] rounded-[2px] shadow-[0_-2px_0_#222] macbook-key custom-animate-keys';
 
   return (
+    /* perspective applied by .macbook-container */
     <div className="macbook-container w-[150px] h-[96px] absolute left-1/2 top-1/2 mt-[-85px] ml-[-78px]">
+
+      {/*
+        transform-style: preserve-3d  → .macbook-inner
+        Initial transform rotateX(-20deg) rotateY(0deg) rotateZ(0deg) = 0% of "rotate" animation
+      */}
       <div className="macbook-inner custom-animate-rotate z-20 absolute w-[150px] h-[96px] left-0 top-0">
 
-        {/* ── Screen lid ── */}
-        <div
-          className={`macbook-screen custom-animate-lid-screen w-[150px] h-[96px] absolute left-0 bottom-0
-                      rounded-[7px] bg-[#ddd]
-                      bg-[linear-gradient(45deg,rgba(0,0,0,0.34)_0%,rgba(0,0,0,0)_100%)]
-                      bg-left-bottom bg-[length:300px_300px]
-                      shadow-[inset_0_3px_7px_rgba(255,255,255,0.5)]`}
-        >
-          <div
-            className={`macbook-screen-face-one w-[150px] h-[96px] absolute left-0 bottom-0
-                        rounded-[7px] bg-[#d3d3d3]
-                        bg-[linear-gradient(45deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}
-          >
-            {/* Webcam dot */}
-            <div className="w-[3px] h-[3px] rounded-full bg-black absolute left-1/2 top-[4px] ml-[-1.5px]" />
-
-            {/* Screen bezel */}
+        {/* ── Screen / lid ── */}
+        {/*
+          transform-style + transform-origin → .macbook-screen
+          Initial rotateX(0deg) = 0% of "lid-screen" animation
+        */}
+        <div className={`macbook-screen custom-animate-lid-screen w-[150px] h-[96px] absolute left-0 bottom-0 rounded-[7px] bg-[#ddd]
+                        bg-[linear-gradient(45deg,rgba(0,0,0,0.34)_0%,rgba(0,0,0,0)_100%)] bg-left-bottom bg-[length:300px_300px]
+                        shadow-[inset_0_3px_7px_rgba(255,255,255,0.5)]`}>
+          {/* transform: translateZ(2px) → .macbook-screen-face-one */}
+          <div className={`macbook-screen-face-one w-[150px] h-[96px] absolute left-0 bottom-0 rounded-[7px] bg-[#d3d3d3]
+                          bg-[linear-gradient(45deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}>
+            <div className="w-[3px] h-[3px] rounded-full bg-black absolute left-1/2 top-[4px] ml-[-1.5px]"></div>
             <div className="w-[130px] h-[74px] m-[10px] bg-black bg-[length:100%_100%] rounded-[1px] relative shadow-[inset_0_0_2px_rgba(0,0,0,1)]">
-              {/* Glare sweep */}
-              <div
-                className={`custom-animate-screen-shade absolute left-0 top-0 w-[130px] h-[74px]
-                            bg-[linear-gradient(-135deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_47%,rgba(255,255,255,0)_48%)]
-                            bg-[length:300px_200px]`}
-              />
+              <div className={`custom-animate-screen-shade absolute left-0 top-0 w-[130px] h-[74px]
+                              bg-[linear-gradient(-135deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_47%,rgba(255,255,255,0)_48%)]
+                              bg-[length:300px_200px] bg-[position:0px_0px]`}></div>
             </div>
-
-            {/* Brand label */}
-            <span className="absolute top-[85px] left-[57px] text-[6px] text-[#666]">
-              MacBook Air
-            </span>
+            <span className="absolute top-[85px] left-[57px] text-[6px] text-[#666]">MacBook Air</span>
           </div>
         </div>
 
         {/* ── Body / base ── */}
-        <div
-          className={`macbook-body custom-animate-lid-macbody w-[150px] h-[96px] absolute left-0 bottom-0
-                      rounded-[7px] bg-[#cbcbcb]
-                      bg-[linear-gradient(45deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}
-        >
-          <div
-            className={`macbook-body-face-one custom-animate-lid-keyboard-area w-[150px] h-[96px] absolute left-0 bottom-0
-                        rounded-[7px] bg-[#dfdfdf]
-                        bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}
-          >
+        {/*
+          transform-style + transform-origin + initial transform: rotateX(-90deg) → .macbook-body
+        */}
+        <div className={`macbook-body custom-animate-lid-macbody w-[150px] h-[96px] absolute left-0 bottom-0 rounded-[7px] bg-[#cbcbcb]
+                        bg-[linear-gradient(45deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}>
+          {/*
+            transform-style + transform: translateZ(-2px) → .macbook-body-face-one
+            background-color animation → .custom-animate-lid-keyboard-area
+          */}
+          <div className={`macbook-body-face-one custom-animate-lid-keyboard-area w-[150px] h-[96px] absolute left-0 bottom-0 rounded-[7px] bg-[#dfdfdf]
+                          bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]`}>
             {/* Trackpad */}
-            <div
-              className="w-[40px] h-[31px] absolute left-1/2 top-1/2 rounded-[4px] mt-[-44px] ml-[-18px]
-                         bg-[#cdcdcd] bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]
-                         shadow-[inset_0_0_3px_#888]"
-            />
-
-            {/* Keyboard */}
-            <div
-              className={`macbook-keyboard w-[130px] h-[45px] absolute left-[7px] top-[41px]
-                          rounded-[4px] bg-[#cdcdcd]
-                          bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]
-                          shadow-[inset_0_0_3px_#777] pl-[2px] overflow-hidden`}
-            >
+            <div className="w-[40px] h-[31px] absolute left-1/2 top-1/2 rounded-[4px] mt-[-44px] ml-[-18px] bg-[#cdcdcd]
+                            bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]
+                            shadow-[inset_0_0_3px_#888]">
+            </div>
+            {/* transform-style: preserve-3d → .macbook-keyboard */}
+            <div className={`macbook-keyboard w-[130px] h-[45px] absolute left-[7px] top-[41px] rounded-[4px] bg-[#cdcdcd]
+                            bg-[linear-gradient(30deg,rgba(0,0,0,0.24)_0%,rgba(0,0,0,0)_100%)]
+                            shadow-[inset_0_0_3px_#777] pl-[2px] overflow-hidden`}>
               {Array.from({ length: 58 }).map((_, i) => (
-                <div
-                  key={`key-${i}`}
-                  className={keyBaseClasses}
-                  style={{ animationDelay: `${1.5 + (i % 12) * 0.07}s` }}
-                />
+                <div key={`key-norm-${i}`} className={keyBaseClasses}></div>
               ))}
-              {/* Space bar */}
-              <div
-                className={`${keyBaseClasses} w-[45px]`}
-                style={{ animationDelay: '2.1s' }}
-              />
-              {/* Function keys (shorter height) */}
+              <div key="key-space" className={`${keyBaseClasses} w-[45px]`}></div>
               {Array.from({ length: 16 }).map((_, i) => (
-                <div
-                  key={`fn-${i}`}
-                  className={`${keyBaseClasses} h-[3px]`}
-                  style={{ animationDelay: `${1.5 + i * 0.05}s` }}
-                />
+                <div key={`key-f-${i}`} className={`${keyBaseClasses} h-[3px]`}></div>
               ))}
             </div>
           </div>
-
           {/* Corner screws */}
-          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute left-[20px] top-[20px]" />
-          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute right-[20px] top-[20px]" />
-          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute right-[20px] bottom-[20px]" />
-          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute left-[20px] bottom-[20px]" />
+          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute left-[20px] top-[20px]"></div>
+          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute right-[20px] top-[20px]"></div>
+          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute right-[20px] bottom-[20px]"></div>
+          <div className="w-[5px] h-[5px] bg-[#333] rounded-full absolute left-[20px] bottom-[20px]"></div>
         </div>
       </div>
 
-      {/* Shadow on ground */}
-      <div className="macbook-shadow custom-animate-macbook-shadow absolute w-[60px] h-[0px] left-[40px] top-[160px]" />
+      {/* Initial transform applied by .macbook-shadow */}
+      <div className={`macbook-shadow custom-animate-macbook-shadow absolute w-[60px] h-[0px] left-[40px] top-[160px]
+                      shadow-[0_0_60px_40px_rgba(0,0,0,0.3)]`}>
+      </div>
     </div>
   );
 };

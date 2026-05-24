@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Macbook } from './Macbook';
+import { Macbook } from '@/components/ui/animated-3d-mac-book-air';
 
 /**
  * Full-screen splash shown on first page-load.
@@ -85,10 +85,8 @@ const SplashScreen = ({ duration = 2800, onComplete }) => {
 
         Then we scale the whole thing up.
       */}
-      <div style={{ transform: 'scale(1.9)', transformOrigin: 'center center' }}>
-        <div style={{ position: 'relative', width: 260, height: 280 }}>
-          <Macbook />
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Macbook />
       </div>
 
       {/* ── Loading dots ─────────────────────────────────────── */}

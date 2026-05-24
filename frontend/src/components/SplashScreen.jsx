@@ -1,17 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import Macbook from './Macbook';
 
-/**
- * Full-screen dark splash — MacBook animation video + logo overlay.
- * Fades out after `duration` ms, then calls onComplete.
- */
 const SplashScreen = ({ duration = 5500, onComplete }) => {
   const [fading, setFading] = useState(false);
   const [gone,   setGone]   = useState(false);
-  const videoRef = useRef(null);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFading(true),                   duration);
-    const t2 = setTimeout(() => { setGone(true); onComplete?.(); }, duration + 600);
+    const t1 = setTimeout(() => setFading(true),                    duration);
+    const t2 = setTimeout(() => { setGone(true); onComplete?.(); }, duration + 800);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [duration, onComplete]);
 
@@ -24,59 +20,55 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         position:      'fixed',
         inset:         0,
         zIndex:        9999,
-        background:    '#050505',
-        userSelect:    'none',
-        transition:    'opacity 0.6s ease',
+        background:    '#060810',
+        transition:    'opacity 0.8s ease',
         opacity:       fading ? 0 : 1,
         pointerEvents: fading ? 'none' : 'all',
         overflow:      'hidden',
+        userSelect:    'none',
       }}
     >
-      {/* ── Video plein écran ────────────────────────────────── */}
-      <video
-        ref={videoRef}
-        src="/macbook-anim.mov"
-        autoPlay
-        muted
-        playsInline
-        style={{
-          position:      'absolute',
-          inset:         0,
-          width:         '100%',
-          height:        '100%',
-          objectFit:     'contain',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* ── Logo + brand name (overlay haut) ────────────────── */}
+      {/* ── Ambient glow blob ───────────────────────────────────── */}
       <div style={{
-        position:      'absolute',
-        top:           '7%',
-        left:          '50%',
-        transform:     'translateX(-50%)',
-        display:       'flex',
-        flexDirection: 'column',
-        alignItems:    'center',
-        gap:           10,
-        zIndex:        2,
-        animation:     'splash-brand-in 0.7s cubic-bezier(0.22,1,0.36,1) 0.2s both',
-        whiteSpace:    'nowrap',
+        position:     'absolute',
+        top:          '50%',
+        left:         '50%',
+        width:        700,
+        height:       700,
+        marginLeft:   -350,
+        marginTop:    -420,
+        borderRadius: '50%',
+        background:   'radial-gradient(circle, rgba(59,130,246,0.07) 0%, rgba(99,102,241,0.03) 45%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Logo + brand (top center) ────────────────────────────── */}
+      <div style={{
+        position:       'absolute',
+        top:            '7%',
+        left:           '50%',
+        transform:      'translateX(-50%)',
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        gap:            8,
+        whiteSpace:     'nowrap',
+        animation:      'splash-brand-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both',
+        zIndex:         2,
       }}>
         <img
           src="/logo.png"
           alt="Aide Numérique 37"
           style={{
-            height:  60,
-            width:   'auto',
-            display: 'block',
-            filter:  'drop-shadow(0 0 18px rgba(96,165,250,0.5))',
+            height: 54,
+            width:  'auto',
+            filter: 'drop-shadow(0 0 18px rgba(96,165,250,0.45))',
           }}
           draggable={false}
         />
         <div style={{ textAlign: 'center' }}>
           <div style={{
-            fontSize:      24,
+            fontSize:      22,
             fontWeight:    700,
             color:         '#e2e8f0',
             fontFamily:    "'Montserrat','Segoe UI',sans-serif",
@@ -85,11 +77,11 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
             Aide Numérique 37
           </div>
           <div style={{
-            fontSize:      11,
-            color:         '#475569',
+            fontSize:      10,
+            color:         '#3d4f6b',
             marginTop:     4,
             fontFamily:    "'Montserrat','Segoe UI',sans-serif",
-            letterSpacing: '0.08em',
+            letterSpacing: '0.14em',
             textTransform: 'uppercase',
           }}>
             Assistance informatique à domicile
@@ -97,27 +89,72 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         </div>
       </div>
 
-      {/* ── Loading dots (overlay bas) ───────────────────────── */}
+      {/* ── MacBook (absolute center) ────────────────────────────── */}
+      {/*
+        The Macbook component positions itself with:
+          absolute left-1/2 top-1/2 mt-[-85px] ml-[-78px]
+        inside a 160×200 relative box.
+        We center that box then scale 2.6× around its center.
+      */}
       <div style={{
         position:  'absolute',
-        bottom:    '7%',
+        top:       '50%',
         left:      '50%',
-        transform: 'translateX(-50%)',
-        display:   'flex',
-        gap:       8,
-        zIndex:    2,
+        marginTop: -100,
+        marginLeft: -80,
+        animation: 'splash-macbook-in 0.8s cubic-bezier(0.22,1,0.36,1) 0.3s both',
+        zIndex:    1,
       }}>
-        {[0, 1, 2].map(i => (
-          <span key={i} style={{
-            display:        'block',
-            width:          6,
-            height:         6,
-            borderRadius:   '50%',
-            background:     'rgba(148,163,184,0.4)',
-            animation:      'splash-dot 1.4s ease-in-out infinite',
-            animationDelay: `${i * 0.22}s`,
+        <div style={{ transform: 'scale(2.6)', transformOrigin: 'center center' }}>
+          <div style={{ position: 'relative', width: 160, height: 200 }}>
+            <Macbook />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Progress bar + dots (bottom) ────────────────────────── */}
+      <div style={{
+        position:       'absolute',
+        bottom:         '7%',
+        left:           '50%',
+        transform:      'translateX(-50%)',
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        gap:            10,
+        zIndex:         2,
+        animation:      'splash-brand-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.4s both',
+      }}>
+        {/* Thin progress bar */}
+        <div style={{
+          width:        120,
+          height:       2,
+          borderRadius: 2,
+          background:   'rgba(255,255,255,0.06)',
+          overflow:     'hidden',
+        }}>
+          <div style={{
+            height:     '100%',
+            borderRadius: 2,
+            background: 'linear-gradient(90deg, #3b82f6 0%, #818cf8 100%)',
+            animation:  `splash-fill ${duration}ms linear 0.5s both`,
           }} />
-        ))}
+        </div>
+
+        {/* Animated dots */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[0, 1, 2].map(i => (
+            <span key={i} style={{
+              display:        'block',
+              width:          5,
+              height:         5,
+              borderRadius:   '50%',
+              background:     'rgba(148,163,184,0.35)',
+              animation:      'splash-dot 1.4s ease-in-out infinite',
+              animationDelay: `${i * 0.22}s`,
+            }} />
+          ))}
+        </div>
       </div>
     </div>
   );

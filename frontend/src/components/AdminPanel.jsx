@@ -963,7 +963,6 @@ const AdminPanel = () => {
                       {[
                         { label: 'Articles internes', value: (dashboardStats.articles.wordpress ?? 0) + (dashboardStats.articles.ai_published ?? 0), icon: BookOpen, color: '#0D2E5C', bg: '#EBF2FB' },
                         { label: 'Articles IA publiés', value: dashboardStats.articles.ai_published, icon: Sparkles, color: '#059669', bg: '#ECFDF5' },
-                        { label: 'Articles planifiés', value: dashboardStats.articles.ai_scheduled, icon: FileText, color: '#D97706', bg: '#FFFBEB' },
                         { label: 'En file d\'attente', value: dashboardStats.planning.pending, icon: Zap, color: '#7C3AED', bg: '#F5F3FF' },
                       ].map((stat) => (
                         <Card key={stat.label} className="border-0 shadow-sm">
@@ -980,6 +979,40 @@ const AdminPanel = () => {
                           </CardContent>
                         </Card>
                       ))}
+                      {/* Carte réserve X/5 */}
+                      {(() => {
+                        const reserved = dashboardStats.articles.ai_scheduled ?? 0;
+                        const TARGET = 5;
+                        const pct = Math.min(100, Math.round((reserved / TARGET) * 100));
+                        const full = reserved >= TARGET;
+                        const color = full ? '#059669' : reserved >= 3 ? '#D97706' : '#DC2626';
+                        const bg = full ? '#ECFDF5' : reserved >= 3 ? '#FFFBEB' : '#FEF2F2';
+                        return (
+                          <Card className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveSection('generator')}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 leading-tight">Réserve déploiement</p>
+                                  <p className="text-3xl font-bold mt-1" style={{ color }}>
+                                    {reserved}<span className="text-base font-medium text-gray-400">/{TARGET}</span>
+                                  </p>
+                                </div>
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+                                  <FileText size={20} style={{ color }} />
+                                </div>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+                              </div>
+                              {!full && (
+                                <p className="text-[10px] font-medium mt-1.5" style={{ color }}>
+                                  {TARGET - reserved} article{TARGET - reserved > 1 ? 's' : ''} manquant{TARGET - reserved > 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })()}
                     </div>
 
                     {/* Secondary stats row */}

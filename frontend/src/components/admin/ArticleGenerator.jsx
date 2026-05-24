@@ -322,15 +322,21 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
       <div className="flex gap-2 border-b">
         {[
           ['create', 'Créer un article', FileText],
-          ['reserve', `En réserve${reserveArticles.length > 0 ? ` (${reserveArticles.length})` : ''}`, Clock],
+          ['reserve', 'En réserve', Clock],
         ].map(([id, label, Icon]) => (
           <button key={id} onClick={() => setGenTab(id)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${genTab === id ? 'border-french-blue text-french-blue' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             data-testid={`gen-subtab-${id}`}>
             <Icon size={15} />{label}
-            {id === 'reserve' && reserveArticles.length > 0 && (
-              <span className="ml-1 bg-orange-100 text-orange-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{reserveArticles.length}</span>
-            )}
+            {id === 'reserve' && (() => {
+              const count = reserveArticles.length;
+              const full = count >= 5;
+              return (
+                <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${full ? 'bg-green-100 text-green-700' : count > 0 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-600'}`}>
+                  {count}/5
+                </span>
+              );
+            })()}
           </button>
         ))}
       </div>
@@ -438,6 +444,53 @@ const ArticleGenerator = ({ setPreviewArticle, setActiveSection, setEditingArtic
       {/* ─── TAB: EN RÉSERVE ─── */}
       {genTab === 'reserve' && (
         <div className="space-y-4">
+          {/* Jauge buffer 5 articles */}
+          {!reserveLoading && (() => {
+            const TARGET = 5;
+            const count = reserveArticles.length;
+            const missing = Math.max(0, TARGET - count);
+            const full = count >= TARGET;
+            const color = full ? '#059669' : count >= 3 ? '#D97706' : '#DC2626';
+            const bg = full ? 'bg-green-50 border-green-200' : count >= 3 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+            const textColor = full ? 'text-green-700' : count >= 3 ? 'text-amber-700' : 'text-red-700';
+            return (
+              <div className={`rounded-xl border p-4 ${bg}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold" style={{ color }}>
+                      {count}/{TARGET} articles en réserve
+                    </span>
+                    {full
+                      ? <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Objectif atteint</span>
+                      : <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${count >= 3 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                          {missing} manquant{missing > 1 ? 's' : ''}
+                        </span>
+                    }
+                  </div>
+                  {!full && (
+                    <Button size="sm"
+                      className="text-xs gap-1.5 h-7 px-3 bg-purple-600 hover:bg-purple-700 text-white"
+                      onClick={() => setGenTab('create')}
+                      data-testid="topup-reserve-btn"
+                    >
+                      <Sparkles size={12} />Générer {missing} article{missing > 1 ? 's' : ''}
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {Array.from({ length: TARGET }).map((_, i) => (
+                    <div key={i} className="flex-1 h-2 rounded-full" style={{ background: i < count ? color : 'rgba(0,0,0,0.08)' }} />
+                  ))}
+                </div>
+                {!full && (
+                  <p className={`text-xs mt-2 ${textColor}`}>
+                    Le déploiement nécessite 5 articles en avance. Générez-en {missing} de plus pour remplir la réserve.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">

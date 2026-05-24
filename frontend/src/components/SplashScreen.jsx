@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Macbook } from './Macbook';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * Full-screen dark splash shown on first page-load.
- * Logo above, CSS isometric MacBook animation below.
+ * Full-screen dark splash — MacBook animation video + logo overlay.
  * Fades out after `duration` ms, then calls onComplete.
  */
 const SplashScreen = ({ duration = 5500, onComplete }) => {
   const [fading, setFading] = useState(false);
   const [gone,   setGone]   = useState(false);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     const t1 = setTimeout(() => setFading(true),                   duration);
@@ -37,33 +36,26 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         overflow:       'hidden',
       }}
     >
-      {/* ── Subtle radial glow behind MacBook ──────────────────── */}
-      <div style={{
-        position:   'absolute',
-        top:        '50%',
-        left:       '50%',
-        transform:  'translate(-50%, -50%)',
-        width:      600,
-        height:     400,
-        background: 'radial-gradient(ellipse, rgba(96,165,250,0.07) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* ── Logo + brand name ───────────────────────────────────── */}
+      {/* ── Logo + brand name ───────────────────────────────── */}
       <div style={{
         display:       'flex',
         flexDirection: 'column',
         alignItems:    'center',
         gap:           10,
-        marginBottom:  48,
-        animation:     'splash-brand-in 0.7s cubic-bezier(0.22,1,0.36,1) 0.2s both',
         position:      'relative',
         zIndex:        2,
+        animation:     'splash-brand-in 0.7s cubic-bezier(0.22,1,0.36,1) 0.2s both',
+        marginBottom:  20,
       }}>
         <img
           src="/logo.png"
           alt="Aide Numérique 37"
-          style={{ height: 52, width: 'auto', display: 'block', filter: 'drop-shadow(0 0 16px rgba(96,165,250,0.35))' }}
+          style={{
+            height:  52,
+            width:   'auto',
+            display: 'block',
+            filter:  'drop-shadow(0 0 14px rgba(96,165,250,0.4))',
+          }}
           draggable={false}
         />
         <div style={{ textAlign: 'center' }}>
@@ -77,11 +69,11 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
             Aide Numérique 37
           </div>
           <div style={{
-            fontSize:      12,
+            fontSize:      11,
             color:         '#475569',
-            marginTop:     4,
+            marginTop:     3,
             fontFamily:    "'Montserrat','Segoe UI',sans-serif",
-            letterSpacing: '0.06em',
+            letterSpacing: '0.08em',
             textTransform: 'uppercase',
           }}>
             Assistance informatique à domicile
@@ -89,45 +81,54 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         </div>
       </div>
 
-      {/* ── MacBook CSS animation ────────────────────────────────── */}
-      {/*
-        The Macbook component uses:
-          absolute left-1/2 top-1/2 mt-[-85px] ml-[-78px]
-        so container must be at least 260×280.
-        We scale up 2.4× for visual impact.
-      */}
+      {/* ── MacBook animation video ──────────────────────────── */}
       <div style={{
-        transform:       'scale(1.85)',
-        transformOrigin: 'center center',
-        position:        'relative',
-        zIndex:          2,
+        position: 'relative',
+        zIndex:   1,
+        width:    '100%',
+        maxWidth: 520,
+        /* video is 1344×810 but MacBook occupies the center ~40%,
+           we crop vertically by capping height to avoid excess black */
+        overflow: 'hidden',
+        height:   200,
+        display:  'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
-        <div style={{ position: 'relative', width: 260, height: 280 }}>
-          <Macbook />
-        </div>
+        <video
+          ref={videoRef}
+          src="/macbook-anim.mov"
+          autoPlay
+          muted
+          playsInline
+          style={{
+            width:     '100%',
+            maxWidth:  520,
+            /* shift up slightly to center the MacBook in the crop window */
+            marginTop: -60,
+            pointerEvents: 'none',
+          }}
+        />
       </div>
 
-      {/* ── Loading dots ─────────────────────────────────────────── */}
+      {/* ── Loading dots ─────────────────────────────────────── */}
       <div style={{
         display:   'flex',
         gap:       8,
-        marginTop: 80,
+        marginTop: 16,
         position:  'relative',
         zIndex:    2,
       }}>
         {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            style={{
-              display:        'block',
-              width:          6,
-              height:         6,
-              borderRadius:   '50%',
-              background:     'rgba(148,163,184,0.4)',
-              animation:      'splash-dot 1.4s ease-in-out infinite',
-              animationDelay: `${i * 0.22}s`,
-            }}
-          />
+          <span key={i} style={{
+            display:        'block',
+            width:          6,
+            height:         6,
+            borderRadius:   '50%',
+            background:     'rgba(148,163,184,0.4)',
+            animation:      'splash-dot 1.4s ease-in-out infinite',
+            animationDelay: `${i * 0.22}s`,
+          }} />
         ))}
       </div>
     </div>

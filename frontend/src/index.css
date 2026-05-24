@@ -508,7 +508,7 @@ code {
    -20deg = top tilts toward viewer → camera above, keyboard at front */
 .macbook-inner {
   transform-style: preserve-3d;
-  transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg);
+  transform: rotateX(-20deg) rotateY(0deg) rotateZ(180deg);
 }
 
 /* screen lid — hinge at bottom edge
@@ -559,8 +559,8 @@ code {
 
 /* Gentle 3-D rocking — starts after the lid has opened */
 @keyframes rotate {
-  0%,100% { transform: rotateX(-20deg) rotateY(0deg)  rotateZ(0deg); }
-  50%      { transform: rotateX(-20deg) rotateY(25deg) rotateZ(0deg); }
+  0%,100% { transform: rotateX(-20deg) rotateY(0deg)   rotateZ(180deg); }
+  50%      { transform: rotateX(-20deg) rotateY(-25deg) rotateZ(180deg); }
 }
 
 /* Lid rises: 0° (closed) → -110° (open)

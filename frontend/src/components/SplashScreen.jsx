@@ -21,46 +21,62 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
     <div
       aria-hidden="true"
       style={{
-        position:       'fixed',
-        inset:          0,
-        zIndex:         9999,
-        background:     '#050505',
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'center',
-        justifyContent: 'center',
-        userSelect:     'none',
-        transition:     'opacity 0.6s ease',
-        opacity:        fading ? 0 : 1,
-        pointerEvents:  fading ? 'none' : 'all',
-        overflow:       'hidden',
+        position:      'fixed',
+        inset:         0,
+        zIndex:        9999,
+        background:    '#050505',
+        userSelect:    'none',
+        transition:    'opacity 0.6s ease',
+        opacity:       fading ? 0 : 1,
+        pointerEvents: fading ? 'none' : 'all',
+        overflow:      'hidden',
       }}
     >
-      {/* ── Logo + brand name ───────────────────────────────── */}
+      {/* ── Video plein écran ────────────────────────────────── */}
+      <video
+        ref={videoRef}
+        src="/macbook-anim.mov"
+        autoPlay
+        muted
+        playsInline
+        style={{
+          position:      'absolute',
+          inset:         0,
+          width:         '100%',
+          height:        '100%',
+          objectFit:     'contain',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ── Logo + brand name (overlay haut) ────────────────── */}
       <div style={{
+        position:      'absolute',
+        top:           '7%',
+        left:          '50%',
+        transform:     'translateX(-50%)',
         display:       'flex',
         flexDirection: 'column',
         alignItems:    'center',
         gap:           10,
-        position:      'relative',
         zIndex:        2,
         animation:     'splash-brand-in 0.7s cubic-bezier(0.22,1,0.36,1) 0.2s both',
-        marginBottom:  20,
+        whiteSpace:    'nowrap',
       }}>
         <img
           src="/logo.png"
           alt="Aide Numérique 37"
           style={{
-            height:  52,
+            height:  60,
             width:   'auto',
             display: 'block',
-            filter:  'drop-shadow(0 0 14px rgba(96,165,250,0.4))',
+            filter:  'drop-shadow(0 0 18px rgba(96,165,250,0.5))',
           }}
           draggable={false}
         />
         <div style={{ textAlign: 'center' }}>
           <div style={{
-            fontSize:      22,
+            fontSize:      24,
             fontWeight:    700,
             color:         '#e2e8f0',
             fontFamily:    "'Montserrat','Segoe UI',sans-serif",
@@ -71,7 +87,7 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
           <div style={{
             fontSize:      11,
             color:         '#475569',
-            marginTop:     3,
+            marginTop:     4,
             fontFamily:    "'Montserrat','Segoe UI',sans-serif",
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
@@ -81,42 +97,14 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         </div>
       </div>
 
-      {/* ── MacBook animation video ──────────────────────────── */}
+      {/* ── Loading dots (overlay bas) ───────────────────────── */}
       <div style={{
-        position: 'relative',
-        zIndex:   1,
-        width:    '100%',
-        maxWidth: 520,
-        /* video is 1344×810 but MacBook occupies the center ~40%,
-           we crop vertically by capping height to avoid excess black */
-        overflow: 'hidden',
-        height:   200,
-        display:  'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <video
-          ref={videoRef}
-          src="/macbook-anim.mov"
-          autoPlay
-          muted
-          playsInline
-          style={{
-            width:     '100%',
-            maxWidth:  520,
-            /* shift up slightly to center the MacBook in the crop window */
-            marginTop: -60,
-            pointerEvents: 'none',
-          }}
-        />
-      </div>
-
-      {/* ── Loading dots ─────────────────────────────────────── */}
-      <div style={{
+        position:  'absolute',
+        bottom:    '7%',
+        left:      '50%',
+        transform: 'translateX(-50%)',
         display:   'flex',
         gap:       8,
-        marginTop: 16,
-        position:  'relative',
         zIndex:    2,
       }}>
         {[0, 1, 2].map(i => (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { HelmetProvider, Helmet } from "react-helmet-async";
@@ -6,7 +6,6 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { CookieConsentProvider } from "./context/CookieConsentContext";
 import CookieBanner from "./components/CookieBanner";
 import GoogleAnalytics from "./components/GoogleAnalytics";
-import SplashScreen from "./components/SplashScreen";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
 import Services from "./components/Services";
@@ -231,25 +230,11 @@ const FAQLayout = () => {
 };
 
 function App() {
-  // Show splash only on the very first page-load (not on back-navigation or route changes)
-  const [splashDone, setSplashDone] = useState(
-    () => sessionStorage.getItem('splash_shown') === '1'
-  );
-
-  const handleSplashComplete = () => {
-    sessionStorage.setItem('splash_shown', '1');
-    setSplashDone(true);
-  };
-
   return (
     <HelmetProvider>
     <ThemeProvider>
     <CookieConsentProvider>
     <div className="App min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
-      {/* Splash screen — only on first load, not on /admin */}
-      {!splashDone && !window.location.pathname.startsWith('/admin') && (
-        <SplashScreen duration={5500} onComplete={handleSplashComplete} />
-      )}
       <BrowserRouter>
         <TrailingSlashRedirect />
         <ParasiteParamGuard />

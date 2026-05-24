@@ -248,7 +248,7 @@ function App() {
     <div className="App min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
       {/* Splash screen — only on first load, not on /admin */}
       {!splashDone && !window.location.pathname.startsWith('/admin') && (
-        <SplashScreen duration={2600} onComplete={handleSplashComplete} />
+        <SplashScreen duration={5500} onComplete={handleSplashComplete} />
       )}
       <BrowserRouter>
         <TrailingSlashRedirect />

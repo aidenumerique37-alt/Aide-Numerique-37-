@@ -2,208 +2,184 @@
 import React, { useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
-export const Macbook = ({ src }) => {
-  const ref = useRef(null);
-  const [open, setOpen]         = useState(false);
-  const [hovered, setHovered]   = useState(false);
+/* ── tiny key rows helper ──────────────────────────────────────── */
+const KeyRow = ({ count, wide = false, height = 7 }) => (
+  <div style={{ display: "flex", gap: 3, marginBottom: 3 }}>
+    {Array.from({ length: count }).map((_, i) => (
+      <div
+        key={i}
+        style={{
+          flex:          wide && i === 0 ? 1.6 : 1,
+          height,
+          background:    "linear-gradient(180deg, #d8d8d8 0%, #c4c4c4 100%)",
+          borderRadius:  2,
+          boxShadow:     "0 1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4)",
+        }}
+      />
+    ))}
+  </div>
+);
 
-  /* ── mouse-tracking for lid tilt ─────────────────────────── */
+export const Macbook = () => {
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  /* ── mouse tilt ─────────────────────────────────────────────── */
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-
-  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 30 });
-  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 30 });
-
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["8deg", "-8deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-8deg", "8deg"]);
+  const mouseXSpring = useSpring(x, { stiffness: 250, damping: 30 });
+  const mouseYSpring = useSpring(y, { stiffness: 250, damping: 30 });
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["6deg", "-6deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-6deg", "6deg"]);
 
   const handleMouseMove = (e) => {
     if (!ref.current || !open) return;
     const rect = ref.current.getBoundingClientRect();
-    const w = rect.width;
-    const h = rect.height;
-    const xPct = (e.clientX - rect.left) / w - 0.5;
-    const yPct = (e.clientY - rect.top)  / h - 0.5;
-    x.set(xPct);
-    y.set(yPct);
+    x.set((e.clientX - rect.left) / rect.width  - 0.5);
+    y.set((e.clientY - rect.top)  / rect.height - 0.5);
   };
+  const handleMouseLeave = () => { x.set(0); y.set(0); };
 
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-    setHovered(false);
-  };
-
-  /* ── open on click / hover ────────────────────────────────── */
+  /* auto-open */
   React.useEffect(() => {
-    const t = setTimeout(() => setOpen(true), 400);
+    const t = setTimeout(() => setOpen(true), 450);
     return () => clearTimeout(t);
   }, []);
+
+  /* ── dimensions ─────────────────────────────────────────────── */
+  const W  = 340;   /* width shared by lid + base           */
+  const LH = 210;   /* lid height  (screen)                 */
+  const BH = 130;   /* base height (keyboard)               */
 
   return (
     <motion.div
       ref={ref}
       onMouseMove={handleMouseMove}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => {}}
       onMouseLeave={handleMouseLeave}
-      style={{
-        perspective: "1200px",
-        display: "inline-block",
-        position: "relative",
-      }}
+      style={{ perspective: "1400px", display: "inline-block", position: "relative" }}
     >
       <motion.div
         style={{
-          rotateX: open ? rotateX : "0deg",
-          rotateY: open ? rotateY : "0deg",
+          rotateX:        open ? rotateX : "0deg",
+          rotateY:        open ? rotateY : "0deg",
           transformStyle: "preserve-3d",
-          position: "relative",
+          position:       "relative",
         }}
       >
-        {/* ── Base ───────────────────────────────────────────── */}
-        <div
-          style={{
-            width:        340,
-            height:       220,
-            background:   "linear-gradient(145deg, #d2d2d2 0%, #b8b8b8 100%)",
-            borderRadius: "12px 12px 0 0",
-            position:     "relative",
-            boxShadow:    "0 4px 40px rgba(0,0,0,0.18)",
-            transformStyle: "preserve-3d",
-          }}
-        >
-          {/* Screen frame */}
-          <div
-            style={{
-              position:   "absolute",
-              inset:      12,
-              background: "#1a1a1a",
-              borderRadius: 6,
-              overflow:   "hidden",
-              boxShadow:  "inset 0 0 8px rgba(0,0,0,0.8)",
-            }}
-          >
-            {/* Screen content — logo + brand */}
-            <div
-              style={{
-                width:          "100%",
-                height:         "100%",
-                background:     "linear-gradient(135deg, #0a0a0a 0%, #111827 100%)",
-                display:        "flex",
-                flexDirection:  "column",
-                alignItems:     "center",
-                justifyContent: "center",
-                gap:            10,
-              }}
-            >
-              <img
-                src="/logo.png"
-                alt=""
-                style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.9 }}
-              />
-              <span
-                style={{
-                  color:       "#60a5fa",
-                  fontSize:    13,
-                  fontWeight:  700,
-                  letterSpacing: "-0.2px",
-                  fontFamily:  "'Montserrat','Segoe UI',sans-serif",
-                }}
-              >
-                Aide Numérique 37
-              </span>
-              <span style={{ color: "#6b7280", fontSize: 10, fontFamily: "'Montserrat','Segoe UI',sans-serif" }}>
-                Chargement…
-              </span>
-            </div>
-            {/* Screen glare */}
-            <div
-              style={{
-                position:   "absolute",
-                inset:      0,
-                background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%)",
-                pointerEvents: "none",
-              }}
-            />
-          </div>
-          {/* Webcam */}
-          <div
-            style={{
-              position:     "absolute",
-              top:          4,
-              left:         "50%",
-              transform:    "translateX(-50%)",
-              width:        6,
-              height:       6,
-              borderRadius: "50%",
-              background:   "#222",
-              boxShadow:    "0 0 0 1px #444",
-            }}
-          />
-          {/* Apple logo */}
-          <div
-            style={{
-              position:   "absolute",
-              bottom:     -18,
-              left:       "50%",
-              transform:  "translateX(-50%)",
-              fontSize:   14,
-              color:      "#888",
-              lineHeight: 1,
-            }}
-          >
-          </div>
-        </div>
 
-        {/* ── Keyboard deck ──────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════
+            BASE — keyboard body
+        ════════════════════════════════════════════════════════ */}
         <div
           style={{
-            width:        340,
-            height:       16,
-            background:   "linear-gradient(180deg, #c8c8c8 0%, #b0b0b0 100%)",
-            borderRadius: "0 0 10px 10px",
-            boxShadow:    "0 6px 20px rgba(0,0,0,0.22)",
-            position:     "relative",
+            width:          W,
+            height:         BH,
+            background:     "linear-gradient(160deg, #dadada 0%, #b8b8b8 100%)",
+            borderRadius:   "0 0 14px 14px",
+            position:       "relative",
+            boxShadow:      "0 8px 40px rgba(0,0,0,0.22)",
           }}
         >
-          {/* Notch for lid indent */}
+          {/* inner surface */}
           <div
             style={{
               position:     "absolute",
-              top:          0,
-              left:         "50%",
-              transform:    "translateX(-50%)",
-              width:        60,
-              height:       4,
-              background:   "#a8a8a8",
-              borderRadius: "0 0 4px 4px",
+              inset:        "6px 8px 8px 8px",
+              background:   "linear-gradient(160deg, #e2e2e2 0%, #cacaca 100%)",
+              borderRadius: "0 0 10px 10px",
             }}
-          />
-          {/* Feet */}
-          {[20, 300].map((l) => (
+          >
+            {/* ── keyboard ── */}
             <div
-              key={l}
               style={{
                 position:     "absolute",
-                bottom:       2,
-                left:         l,
-                width:        20,
-                height:       4,
-                background:   "#999",
-                borderRadius: 2,
+                top:          10,
+                left:         14,
+                right:        14,
+              }}
+            >
+              {/* function-key row */}
+              <div style={{ display: "flex", gap: 3, marginBottom: 5 }}>
+                {Array.from({ length: 14 }).map((_, i) => (
+                  <div key={i} style={{
+                    flex: 1, height: 4,
+                    background: "linear-gradient(180deg,#d0d0d0 0%,#bcbcbc 100%)",
+                    borderRadius: 1,
+                    boxShadow: "0 1px 0 rgba(0,0,0,0.2)",
+                  }} />
+                ))}
+              </div>
+              <KeyRow count={13} />
+              <KeyRow count={12} wide />
+              <KeyRow count={11} />
+              {/* spacebar row */}
+              <div style={{ display: "flex", gap: 3, marginBottom: 3, alignItems: "center" }}>
+                {[1,1,1].map((_, i) => (
+                  <div key={i} style={{
+                    flex:1, height:7,
+                    background:"linear-gradient(180deg,#d8d8d8 0%,#c4c4c4 100%)",
+                    borderRadius:2,
+                    boxShadow:"0 1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4)",
+                  }}/>
+                ))}
+                {/* spacebar */}
+                <div style={{
+                  flex:5, height:7,
+                  background:"linear-gradient(180deg,#d8d8d8 0%,#c4c4c4 100%)",
+                  borderRadius:2,
+                  boxShadow:"0 1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4)",
+                }}/>
+                {[1,1,1,1].map((_, i) => (
+                  <div key={i} style={{
+                    flex:1, height:7,
+                    background:"linear-gradient(180deg,#d8d8d8 0%,#c4c4c4 100%)",
+                    borderRadius:2,
+                    boxShadow:"0 1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4)",
+                  }}/>
+                ))}
+              </div>
+            </div>
+
+            {/* ── trackpad ── */}
+            <div
+              style={{
+                position:     "absolute",
+                bottom:       10,
+                left:         "50%",
+                transform:    "translateX(-50%)",
+                width:        88,
+                height:       56,
+                background:   "linear-gradient(160deg, #d4d4d4 0%, #c0c0c0 100%)",
+                borderRadius: 5,
+                boxShadow:    "inset 0 1px 3px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.6)",
               }}
             />
-          ))}
+          </div>
+
+          {/* hinge notch */}
+          <div style={{
+            position:     "absolute",
+            top:          0,
+            left:         "50%",
+            transform:    "translateX(-50%)",
+            width:        70,
+            height:       4,
+            background:   "#b0b0b0",
+            borderRadius: "0 0 4px 4px",
+          }} />
         </div>
 
-        {/* ── Lid ────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════
+            LID — animated screen (opens upward)
+        ════════════════════════════════════════════════════════ */}
         <motion.div
           initial={{ rotateX: 90 }}
-          animate={{ rotateX: open ? -105 : 90 }}
-          transition={{ duration: 1.4, ease: [0.34, 1.26, 0.64, 1] }}
+          animate={{ rotateX: open ? -108 : 90 }}
+          transition={{ duration: 1.6, ease: [0.34, 1.18, 0.64, 1] }}
           style={{
-            width:           340,
-            height:          220,
+            width:           W,
+            height:          LH,
             position:        "absolute",
             top:             0,
             left:            0,
@@ -211,33 +187,30 @@ export const Macbook = ({ src }) => {
             transformStyle:  "preserve-3d",
           }}
         >
-          {/* Outer lid shell */}
+          {/* outer shell (back of lid) */}
           <div
             style={{
-              width:        "100%",
-              height:       "100%",
-              background:   "linear-gradient(145deg, #e0e0e0 0%, #c0c0c0 100%)",
-              borderRadius: "12px 12px 0 0",
+              width:              "100%",
+              height:             "100%",
+              background:         "linear-gradient(145deg, #e2e2e2 0%, #c2c2c2 100%)",
+              borderRadius:       "12px 12px 0 0",
               backfaceVisibility: "hidden",
-              boxShadow:    "0 -2px 12px rgba(0,0,0,0.1)",
+              boxShadow:          "0 -2px 16px rgba(0,0,0,0.12)",
+              position:           "relative",
             }}
           >
-            {/* Apple logo on lid back */}
-            <div
-              style={{
-                position:   "absolute",
-                top:        "50%",
-                left:       "50%",
-                transform:  "translate(-50%,-50%)",
-                fontSize:   28,
-                color:      "rgba(0,0,0,0.12)",
-              }}
-            >
-
-            </div>
+            {/* Apple logo cutout hint */}
+            <div style={{
+              position:  "absolute", top: "50%", left: "50%",
+              transform: "translate(-50%,-50%)",
+              width: 28, height: 34,
+              background: "rgba(0,0,0,0.06)",
+              borderRadius: "50% 50% 50% 50% / 40% 40% 60% 60%",
+              clipPath: "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)",
+            }} />
           </div>
 
-          {/* Inner lid face (the screen side) */}
+          {/* inner face — the screen */}
           <div
             style={{
               width:              "100%",
@@ -251,20 +224,23 @@ export const Macbook = ({ src }) => {
               backfaceVisibility: "hidden",
             }}
           >
+            {/* screen bezel */}
             <div
               style={{
                 position:     "absolute",
-                inset:        12,
-                background:   "#1a1a1a",
+                inset:        10,
+                background:   "#111",
                 borderRadius: 6,
                 overflow:     "hidden",
+                boxShadow:    "inset 0 0 10px rgba(0,0,0,0.9)",
               }}
             >
+              {/* screen content */}
               <div
                 style={{
                   width:          "100%",
                   height:         "100%",
-                  background:     "linear-gradient(135deg, #0a0a0a 0%, #111827 100%)",
+                  background:     "linear-gradient(135deg, #090909 0%, #0f172a 100%)",
                   display:        "flex",
                   flexDirection:  "column",
                   alignItems:     "center",
@@ -272,55 +248,81 @@ export const Macbook = ({ src }) => {
                   gap:            10,
                 }}
               >
-                <img
+                <motion.img
                   src="/logo.png"
                   alt=""
-                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: open ? 0.95 : 0, scale: open ? 1 : 0.8 }}
+                  transition={{ delay: 1.0, duration: 0.6 }}
+                  style={{ width: 44, height: 44, objectFit: "contain" }}
                 />
-                <span
+                <motion.span
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: open ? 1 : 0, y: open ? 0 : 6 }}
+                  transition={{ delay: 1.2, duration: 0.5 }}
                   style={{
-                    color:       "#60a5fa",
-                    fontSize:    13,
-                    fontWeight:  700,
+                    color:         "#60a5fa",
+                    fontSize:      13,
+                    fontWeight:    700,
                     letterSpacing: "-0.2px",
-                    fontFamily:  "'Montserrat','Segoe UI',sans-serif",
+                    fontFamily:    "'Montserrat','Segoe UI',sans-serif",
                   }}
                 >
                   Aide Numérique 37
-                </span>
+                </motion.span>
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: open ? 0.5 : 0 }}
+                  transition={{ delay: 1.5, duration: 0.4 }}
+                  style={{
+                    color:      "#6b7280",
+                    fontSize:   10,
+                    fontFamily: "'Montserrat','Segoe UI',sans-serif",
+                  }}
+                >
+                  Chargement…
+                </motion.span>
               </div>
+
+              {/* screen glare */}
+              <div style={{
+                position:      "absolute",
+                inset:         0,
+                background:    "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%)",
+                pointerEvents: "none",
+              }} />
             </div>
-            {/* Webcam */}
-            <div
-              style={{
-                position:     "absolute",
-                top:          4,
-                left:         "50%",
-                transform:    "translateX(-50%)",
-                width:        6,
-                height:       6,
-                borderRadius: "50%",
-                background:   "#222",
-              }}
-            />
+
+            {/* webcam */}
+            <div style={{
+              position:     "absolute",
+              top:          4,
+              left:         "50%",
+              transform:    "translateX(-50%)",
+              width:        5,
+              height:       5,
+              borderRadius: "50%",
+              background:   "#1a1a1a",
+              boxShadow:    "0 0 0 1px #333",
+            }} />
           </div>
         </motion.div>
 
-        {/* ── Shadow on ground ───────────────────────────────── */}
+        {/* ── ground shadow ─────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, scaleX: 0.5 }}
-          animate={{ opacity: open ? 0.35 : 0, scaleX: open ? 1 : 0.5 }}
-          transition={{ duration: 1.2, delay: 0.3 }}
+          initial={{ opacity: 0, scaleX: 0.4 }}
+          animate={{ opacity: open ? 0.3 : 0, scaleX: open ? 1 : 0.4 }}
+          transition={{ duration: 1.4, delay: 0.5 }}
           style={{
-            position:         "absolute",
-            bottom:           -50,
-            left:             "50%",
-            translateX:       "-50%",
-            width:            260,
-            height:           40,
-            background:       "radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, transparent 70%)",
-            filter:           "blur(16px)",
-            transformOrigin:  "center",
+            position:        "absolute",
+            bottom:          -52,
+            left:            "50%",
+            translateX:      "-50%",
+            width:           280,
+            height:          44,
+            background:      "radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 70%)",
+            filter:          "blur(18px)",
+            transformOrigin: "center",
           }}
         />
       </motion.div>

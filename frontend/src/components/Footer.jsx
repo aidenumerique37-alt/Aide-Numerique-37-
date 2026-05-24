@@ -1,188 +1,163 @@
 import React from 'react';
-import { Heart, Phone, Mail, Clock, Cookie } from 'lucide-react';
+import { Heart, Phone, Mail, Clock, Cookie, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCookieConsent } from '../context/CookieConsentContext';
 import { OpenStatusBadge } from './OpenStatusBadge';
-
-const contactInfo = {
-  phone: "07 61 50 35 85",
-  email: "aidenumerique37@gmail.com",
-  location: "Indre-et-Loire (37)"
-};
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { reset } = useCookieConsent();
 
   return (
-    <footer className="bg-gray-900 dark:bg-gray-950 dark:border-t dark:border-gray-800 text-gray-300 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid md:grid-cols-4 gap-8 mb-8">
-          {/* Left - Brand */}
-          <div className="md:col-span-2">
-            <h3 className="text-2xl font-bold text-white mb-4">
+    <footer className="bg-gray-900 dark:bg-gray-950 dark:border-t dark:border-gray-800 text-gray-400 transition-colors duration-300">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-8">
+
+        {/* ── Grille principale ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+
+          {/* Col 1 — Marque */}
+          <div className="lg:col-span-1">
+            <h3 className="text-white font-bold text-lg mb-3 tracking-tight">
               Aide Numérique 37
             </h3>
-            <p className="text-gray-400 leading-relaxed mb-5">
-              Votre assistant numérique à domicile en Indre-et-Loire. 
-              Service à la Personne agréé avec crédit d'impôt de 50%.
+            <p className="text-gray-400 text-sm leading-relaxed mb-5">
+              Assistance informatique à domicile en Indre-et-Loire. Service à la Personne agréé — crédit d'impôt 50 %.
             </p>
             <OpenStatusBadge variant="full" />
           </div>
 
-          {/* Center Left - Quick Links Column 1 */}
+          {/* Col 2 — Navigation */}
           <div>
-            <h4 className="text-lg font-semibold text-white mb-4">
+            <h4 className="text-white text-xs font-bold uppercase tracking-widest mb-4">
               Navigation
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2.5 text-sm">
               <li>
-                <button 
-                  onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
+                <button onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-gray-400 hover:text-white transition-colors text-left">
                   Services
                 </button>
               </li>
               <li>
-                <Link
-                  to="/credit-impot"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
-                  Crédit d'Impôt & Avance Immédiate
+                <Link to="/credit-impot" className="text-gray-400 hover:text-white transition-colors">
+                  Crédit d'impôt & Avance immédiate
                 </Link>
               </li>
               <li>
-                <button 
-                  onClick={() => document.getElementById('avis')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
-                  Avis Clients
+                <button onClick={() => document.getElementById('avis')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-gray-400 hover:text-white transition-colors text-left">
+                  Avis clients
                 </button>
               </li>
               <li>
-                <button 
-                  onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
+                <Link to="/a-propos" className="text-gray-400 hover:text-white transition-colors">
+                  À propos
+                </Link>
+              </li>
+              <li>
+                <Link to="/articles" className="text-gray-400 hover:text-white transition-colors">
+                  Articles
+                </Link>
+              </li>
+              <li>
+                <button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-gray-400 hover:text-white transition-colors text-left">
                   Contact
                 </button>
               </li>
             </ul>
           </div>
 
-          {/* Center Right - Quick Links Column 2 */}
+          {/* Col 3 — Zones & légal */}
           <div>
-            <h4 className="text-lg font-semibold text-white mb-4">
-              Informations
+            <h4 className="text-white text-xs font-bold uppercase tracking-widest mb-4">
+              Zones & Légal
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-2.5 text-sm">
               <li>
-                <Link 
-                  to="/a-propos"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
-                  A propos
+                <Link to="/intervention/joue-les-tours" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                  <MapPin size={13} className="shrink-0" /> Joué-lès-Tours
                 </Link>
               </li>
               <li>
-                <Link 
-                  to="/articles"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
-                  Articles
+                <Link to="/intervention/chambray-les-tours" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                  <MapPin size={13} className="shrink-0" /> Chambray-lès-Tours
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/mentions-legales"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
+                <Link to="/intervention/tours" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                  <MapPin size={13} className="shrink-0" /> Tours
+                </Link>
+              </li>
+              <li className="pt-2 border-t border-gray-800">
+                <Link to="/mentions-legales" className="text-gray-400 hover:text-white transition-colors">
                   Mentions légales
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/cgv"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
+                <Link to="/cgv" className="text-gray-400 hover:text-white transition-colors">
                   CGV
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/politique-de-confidentialite"
-                  className="text-gray-400 hover:text-french-blue transition-colors"
-                >
+                <Link to="/politique-de-confidentialite" className="text-gray-400 hover:text-white transition-colors">
                   Confidentialité
                 </Link>
               </li>
               <li>
-                <button
-                  onClick={reset}
-                  className="text-gray-400 hover:text-french-blue transition-colors flex items-center gap-1.5"
-                >
-                  <Cookie size={14} />
-                  Gérer les cookies
+                <button onClick={reset} className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                  <Cookie size={13} className="shrink-0" /> Gérer les cookies
                 </button>
-              </li>
-              <li>
-                <Link to="/intervention/joue-les-tours" className="text-gray-400 hover:text-french-blue transition-colors">
-                  Joue-les-Tours
-                </Link>
-              </li>
-              <li>
-                <Link to="/intervention/chambray-les-tours" className="text-gray-400 hover:text-french-blue transition-colors">
-                  Chambray-les-Tours
-                </Link>
-              </li>
-              <li>
-                <Link to="/intervention/tours" className="text-gray-400 hover:text-french-blue transition-colors">
-                  Tours
-                </Link>
-              </li>
-              <li>
-                <a 
-                  href={`tel:${contactInfo.phone.replace(/\s/g, '')}`}
-                  className="text-gray-400 hover:text-french-blue transition-colors flex items-center gap-2"
-                >
-                  <Phone size={16} />
-                  {contactInfo.phone}
-                </a>
-              </li>
-              <li>
-                <a 
-                  href={`mailto:${contactInfo.email}`}
-                  className="text-gray-400 hover:text-french-blue transition-colors flex items-center gap-2"
-                >
-                  <Mail size={16} />
-                  {contactInfo.email}
-                </a>
-              </li>
-              <li className="text-gray-400 flex items-start gap-2 pt-1" data-testid="footer-hours">
-                <Clock size={16} className="mt-0.5 shrink-0" />
-                <span>
-                  <span className="block text-white font-medium text-sm">7j/7 — 8h30 à 20h</span>
-                  <span className="text-xs">Lun. – Dim. (Dim. &amp; fériés sur RDV)</span>
-                </span>
               </li>
             </ul>
           </div>
+
+          {/* Col 4 — Contact */}
+          <div>
+            <h4 className="text-white text-xs font-bold uppercase tracking-widest mb-4">
+              Contact
+            </h4>
+            <ul className="space-y-4 text-sm">
+              <li>
+                <a href="tel:0761503585" className="flex items-center gap-2.5 text-gray-400 hover:text-white transition-colors group">
+                  <div className="w-8 h-8 rounded-md bg-gray-800 group-hover:bg-gray-700 flex items-center justify-center shrink-0 transition-colors">
+                    <Phone size={14} />
+                  </div>
+                  <span className="font-medium text-white">07 61 50 35 85</span>
+                </a>
+              </li>
+              <li>
+                <a href="mailto:aidenumerique37@gmail.com" className="flex items-center gap-2.5 text-gray-400 hover:text-white transition-colors group">
+                  <div className="w-8 h-8 rounded-md bg-gray-800 group-hover:bg-gray-700 flex items-center justify-center shrink-0 transition-colors">
+                    <Mail size={14} />
+                  </div>
+                  <span className="break-all">aidenumerique37@gmail.com</span>
+                </a>
+              </li>
+              <li className="flex items-start gap-2.5" data-testid="footer-hours">
+                <div className="w-8 h-8 rounded-md bg-gray-800 flex items-center justify-center shrink-0 mt-0.5">
+                  <Clock size={14} />
+                </div>
+                <div>
+                  <span className="block text-white font-medium">7j/7 — 8h30 à 20h</span>
+                  <span className="text-xs text-gray-500">Dim. & fériés sur RDV</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-gray-400 text-sm">
-              © {currentYear} Aide Numérique 37. Tous droits réservés.
-            </div>
-            <div className="flex items-center gap-2 text-gray-400 text-sm">
-              <span>Créé avec</span>
-              <Heart size={16} className="fill-french-red text-french-red" />
-              <span>en Indre-et-Loire</span>
-            </div>
-          </div>
+        {/* ── Bas de page ── */}
+        <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <span className="text-gray-500 text-xs">
+            © {currentYear} Aide Numérique 37. Tous droits réservés.
+          </span>
+          <span className="flex items-center gap-1.5 text-gray-500 text-xs">
+            Créé avec <Heart size={13} className="fill-red-500 text-red-500" /> en Indre-et-Loire
+          </span>
         </div>
+
       </div>
     </footer>
   );

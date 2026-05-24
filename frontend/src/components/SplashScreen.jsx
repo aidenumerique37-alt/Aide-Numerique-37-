@@ -97,7 +97,7 @@ const SplashScreen = ({ duration = 5500, onComplete }) => {
         We scale up 2.4× for visual impact.
       */}
       <div style={{
-        transform:       'scale(2.4)',
+        transform:       'scale(1.85)',
         transformOrigin: 'center center',
         position:        'relative',
         zIndex:          2,

@@ -501,7 +501,7 @@ code {
 
 /* perspective wrapper */
 .macbook-container {
-  perspective: 500px;
+  perspective: 900px;
 }
 
 /* inner 3-D stage — initial pos is the 0% keyframe of "rotate" */
@@ -510,11 +510,14 @@ code {
   transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg);
 }
 
-/* screen lid — hinge at bottom edge */
+/* screen lid — hinge at bottom edge
+   backface-visibility:hidden → hides the gray outer shell when
+   the lid has rotated past vertical (back faces viewer); the
+   dark face-one (default visible) then shows through from behind */
 .macbook-screen {
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
-  /* initial = 0% of lid-screen (rotateX(0deg) = flat / closed) */
+  backface-visibility: hidden;
 }
 
 /* screen front face — sits 2px toward viewer */
@@ -529,10 +532,11 @@ code {
   transform: rotateX(-90deg);
 }
 
-/* body face — sits 2px behind body */
+/* body face — sits 2px IN FRONT of body → keyboard covers the
+   corner-screw back-plate when the base is lying flat */
 .macbook-body-face-one {
   transform-style: preserve-3d;
-  transform: translateZ(-2px);
+  transform: translateZ(2px);
 }
 
 .macbook-keyboard {

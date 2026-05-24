@@ -36,6 +36,7 @@ import FadeInSection from "./components/FadeInSection";
 import LocalFAQ from "./components/LocalFAQ";
 import StickyMobileCTA from "./components/StickyMobileCTA";
 import RecentArticles from "./components/RecentArticles";
+import CookieSettingsButton from "./components/CookieSettingsButton";
 
 const CANONICAL_SITE = 'https://www.aidenumerique37.fr';
 
@@ -263,6 +264,7 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <CookieBanner />
+        <CookieSettingsButton />
         <GoogleAnalytics />
       </BrowserRouter>
     </div>

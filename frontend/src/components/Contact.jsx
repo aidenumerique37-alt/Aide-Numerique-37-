@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Phone, Mail, MapPin, Facebook, Instagram, ExternalLink, Clock } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import ContactForm from './ContactForm';
+import ContactFormV2 from './ContactFormV2';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -20,6 +21,7 @@ const socialLinks = {
 
 const Contact = () => {
   const [content, setContent] = useState({ title: 'Contactez-Moi', subtitle: '' });
+  const [formVersion, setFormVersion] = useState('v1');
 
   useEffect(() => {
     axios.get(`${BACKEND_URL}/api/admin/content`)
@@ -176,7 +178,25 @@ const Contact = () => {
 
           {/* Right Content - Contact Form */}
           <div className="relative">
-            <ContactForm />
+            {/* Switcher A/B */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-white/50 uppercase tracking-widest font-semibold">Version :</span>
+              <div className="flex rounded-lg overflow-hidden border border-white/20">
+                <button
+                  onClick={() => setFormVersion('v1')}
+                  className={`px-4 py-1.5 text-xs font-bold transition-all ${formVersion === 'v1' ? 'bg-white text-french-blue' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+                >
+                  V1 — Friendly
+                </button>
+                <button
+                  onClick={() => setFormVersion('v2')}
+                  className={`px-4 py-1.5 text-xs font-bold transition-all ${formVersion === 'v2' ? 'bg-white text-french-blue' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+                >
+                  V2 — Strict
+                </button>
+              </div>
+            </div>
+            {formVersion === 'v1' ? <ContactForm /> : <ContactFormV2 />}
           </div>
         </div>
       </div>

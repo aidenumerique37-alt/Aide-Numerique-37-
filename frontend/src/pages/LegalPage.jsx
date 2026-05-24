@@ -60,9 +60,21 @@ const LegalPage = ({ pageType, canonicalPath, metaDescription }) => {
           </div>
         ) : (
           <>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-10">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
               {title}
             </h1>
+
+            <div className="mb-10 p-4 rounded-xl bg-french-blue/5 border border-french-blue/20 flex items-center justify-between gap-4 flex-wrap">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Une question sur nos conditions ? Contactez-nous directement.
+              </p>
+              <Link
+                to="/#contact"
+                className="shrink-0 px-4 py-2 bg-french-blue text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Nous contacter
+              </Link>
+            </div>
 
             <div
               className="article-content [&_p]:text-left [&_p]:hyphens-none dark:text-gray-300 dark:[&_h2]:text-white dark:[&_h3]:text-gray-100 dark:[&_a]:text-french-blue dark:[&_strong]:text-white dark:[&_li]:text-gray-300"

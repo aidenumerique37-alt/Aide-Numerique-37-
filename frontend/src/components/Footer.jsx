@@ -105,7 +105,10 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <button onClick={reset} className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                <button
+                  onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5"
+                >
                   <Cookie size={13} className="shrink-0" /> Gérer les cookies
                 </button>
               </li>

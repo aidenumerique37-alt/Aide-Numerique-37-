@@ -505,10 +505,10 @@ code {
 }
 
 /* inner 3-D stage — initial pos is the 0% keyframe of "rotate"
-   +20deg = top goes AWAY from viewer → camera is above the MacBook */
+   -20deg = top tilts toward viewer → camera above, keyboard at front */
 .macbook-inner {
   transform-style: preserve-3d;
-  transform: rotateX(20deg) rotateY(0deg) rotateZ(0deg);
+  transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg);
 }
 
 /* screen lid — hinge at bottom edge
@@ -559,16 +559,18 @@ code {
 
 /* Gentle 3-D rocking — starts after the lid has opened */
 @keyframes rotate {
-  0%,100% { transform: rotateX(20deg) rotateY(0deg)   rotateZ(0deg); }
-  50%      { transform: rotateX(20deg) rotateY(-25deg) rotateZ(0deg); }
+  0%,100% { transform: rotateX(-20deg) rotateY(0deg)  rotateZ(0deg); }
+  50%      { transform: rotateX(-20deg) rotateY(25deg) rotateZ(0deg); }
 }
 
-/* Lid rises: 0° (closed flat) → -80° (open, screen faces viewer) */
+/* Lid rises: 0° (closed) → -110° (open)
+   backface-visibility:hidden on .macbook-screen means the gray outer shell
+   disappears when the lid passes vertical; the dark face-one shows through */
 @keyframes lid-screen {
-  0%   { transform: rotateX(0deg);   }
-  65%  { transform: rotateX(-90deg); }
-  80%  { transform: rotateX(-75deg); }
-  100% { transform: rotateX(-80deg); }
+  0%   { transform: rotateX(0deg);    }
+  65%  { transform: rotateX(-115deg); }
+  80%  { transform: rotateX(-105deg); }
+  100% { transform: rotateX(-110deg); }
 }
 
 /* Body unfolds: -90° (up) → 0° (flat) */
